@@ -55,6 +55,13 @@ const STAT_ICONS = {
 
 const $ = (id) => document.getElementById(id);
 
+function syncPreferredTheme() {
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  const apply = () => document.documentElement.setAttribute("data-bs-theme", media.matches ? "dark" : "light");
+  apply();
+  media.addEventListener("change", apply);
+}
+
 const formatSpellType = (spell) => {
   const raw = spell?.type || "combat";
   const label = String(raw).replace(/_/g, " ");
@@ -102,6 +109,18 @@ function normalizeEquipmentEntry(raw) {
     count: clampInt(raw.count ?? 1, 1, 999, 1),
     equipped,
   };
+}
+
+function normalizeEquipmentList(rawList, { keepEmpty = false } = {}) {
+  if (!Array.isArray(rawList)) return [];
+  const normalized = [];
+  for (const raw of rawList) {
+    const entry = normalizeEquipmentEntry(raw);
+    if (!entry.id && !entry.custom && !keepEmpty) continue;
+    normalized.push(entry);
+    if (normalized.length >= EQUIPMENT_SLOTS) break;
+  }
+  return normalized;
 }
 
 function getEquipmentItem(entry) {
@@ -281,7 +300,7 @@ function newMember(name, seed = null) {
     dead: false,
     actedThisRound: false,
     buffs: [],
-    equipment: Array.from({ length: EQUIPMENT_SLOTS }, () => ({ ...EMPTY_EQUIPMENT_ENTRY })),
+    equipment: [],
     notes: "",
     spells: Array.from({ length: SPELL_SLOTS }, () => ({ id: "", status: "ready" })),
     // spell usage tracked per hero
@@ -298,9 +317,7 @@ function newMember(name, seed = null) {
     armour: clampInt(seed.armour, 0, 99, 0),
     health: clampInt(seed.health, 0, 999, 8),
     maxHealth: clampInt(seed.maxHealth, 1, 999, 8),
-    equipment: Array.isArray(seed.equipment)
-      ? Array.from({ length: EQUIPMENT_SLOTS }, (_, i) => normalizeEquipmentEntry(seed.equipment[i]))
-      : base.equipment,
+    equipment: normalizeEquipmentList(seed.equipment),
     notes: typeof seed.notes === "string" ? seed.notes : "",
     spells: Array.isArray(seed.spells)
       ? Array.from({ length: SPELL_SLOTS }, (_, i) => ({
@@ -447,9 +464,7 @@ function normalizeForCombat() {
     p.actedThisRound = false;
     p.buffs = [];
     p.spellsUsed = {};
-    p.equipment = Array.isArray(p.equipment)
-      ? Array.from({ length: EQUIPMENT_SLOTS }, (_, i) => normalizeEquipmentEntry(p.equipment[i]))
-      : Array.from({ length: EQUIPMENT_SLOTS }, () => ({ ...EMPTY_EQUIPMENT_ENTRY }));
+    p.equipment = normalizeEquipmentList(p.equipment, { keepEmpty: true });
     enforceWeaponHandLimit(p);
     p.spells = Array.isArray(p.spells)
       ? Array.from({ length: SPELL_SLOTS }, (_, i) => ({
@@ -727,6 +742,8 @@ function castSpell({ casterIdx, spellId, targets }) {
 function renderEditors() {
   const pe = $("partyEditor");
   pe.innerHTML = "";
+  const addMemberBtn = $("addMember");
+  if (addMemberBtn) addMemberBtn.disabled = state.party.length >= 4;
 
   let itemList = document.getElementById("itemOptions");
   if (!itemList) {
@@ -753,9 +770,7 @@ function renderEditors() {
     const div = document.createElement("div");
     div.className = "panel panel-default hero-card";
     enforceWeaponHandLimit(p);
-    const equipment = Array.isArray(p.equipment)
-      ? Array.from({ length: EQUIPMENT_SLOTS }, (_, i) => normalizeEquipmentEntry(p.equipment[i]))
-      : Array.from({ length: EQUIPMENT_SLOTS }, () => ({ ...EMPTY_EQUIPMENT_ENTRY }));
+    const equipment = normalizeEquipmentList(p.equipment, { keepEmpty: true });
     const statBadges = (() => {
       const stats = computeDisplayedStats(p);
       const statKeys = ["fighting", "stealth", "lore", "survival", "charisma", "armour"];
@@ -769,26 +784,43 @@ function renderEditors() {
       const eq = normalizeEquipmentEntry(eqRaw);
       const item = getEquipmentItem(eq);
       const isWeapon = item?.type === "weapon";
+      const itemLabel = escapeHtml(item?.name || eq.custom || "");
       return `
       <div class="equip-row">
-        <label class="equip-label">Item ${slot + 1}
-          <input type="text" class="form-control input-sm" list="itemOptions" data-k="equipment" data-field="name" data-ei="${slot}" data-i="${idx}" value="${escapeHtml(eq.custom || item?.name || "")}" placeholder="Empty">
-        </label>
-        ${item?.countable ? `
-          <label class="equip-count">Count
-            <input type="number" class="form-control input-sm" min="1" max="999" data-k="equipment" data-field="count" data-ei="${slot}" data-i="${idx}" value="${eq.count || 1}">
-          </label>
-        ` : ""}
-        ${isWeapon ? `
-          <label class="equip-equipped">
-            <span>Equipped</span>
-            <input type="checkbox" data-k="equipment" data-field="equipped" data-ei="${slot}" data-i="${idx}" ${eq.equipped ? "checked" : ""}>
-          </label>
-        ` : ""}
+        <div class="row g-3 align-items-end">
+          <div class="col-md-6">
+            <label class="form-label small">Item</label>
+            <input type="text" class="form-control form-control-sm" list="itemOptions" data-k="equipment" data-field="name" data-ei="${slot}" data-i="${idx}" value="${itemLabel}" placeholder="Item name">
+          </div>
+          ${item?.countable ? `
+            <div class="col-md-2">
+              <label class="form-label small">Count</label>
+              <input type="number" class="form-control form-control-sm" min="1" max="999" data-k="equipment" data-field="count" data-ei="${slot}" data-i="${idx}" value="${eq.count || 1}">
+            </div>
+          ` : ""}
+          ${isWeapon ? `
+            <div class="col-md-2">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" data-k="equipment" data-field="equipped" data-ei="${slot}" data-i="${idx}" ${eq.equipped ? "checked" : ""} id="equip-${idx}-${slot}">
+                <label class="form-check-label small" for="equip-${idx}-${slot}">Equipped</label>
+              </div>
+            </div>
+          ` : ""}
+          <div class="col-md-2 text-end">
+            <button class="btn btn-outline-danger btn-sm" data-del-equipment="${slot}" data-i="${idx}">Remove</button>
+          </div>
+        </div>
         <div class="muted equip-help">${escapeHtml(item ? describeItem(item, eq) : (eq.custom ? "Custom item" : "No item"))}</div>
       </div>
     `;
     }).join("");
+
+    const equipmentMeta = `
+      <div class="d-flex justify-content-between align-items-center equipment-meta">
+        <div class="muted small">${equipment.length}/${EQUIPMENT_SLOTS} slots used</div>
+        <button class="btn btn-outline-primary btn-sm" data-add-equipment="${idx}" ${equipment.length >= EQUIPMENT_SLOTS ? "disabled" : ""}>Add slot</button>
+      </div>
+    `;
 
     const spellRows = [];
     if (isSpellcaster(p.name)) {
@@ -829,15 +861,20 @@ function renderEditors() {
                   </select>
                 </label>
               </div>
-              <div class="col-sm-6 text-right">
-                <button class="btn btn-link btn-sm" data-edit-stats="${idx}">Edit stats</button>
-                <button class="btn btn-default btn-sm" data-del-party="${idx}">Remove</button>
+              <div class="col-sm-6">
+                <div class="d-flex justify-content-end gap-2 flex-wrap">
+                  <button class="btn btn-outline-secondary btn-sm" data-edit-stats="${idx}">Edit stats</button>
+                  <button class="btn btn-default btn-sm" data-del-party="${idx}">Remove</button>
+                </div>
               </div>
             </div>
             <div class="stat-summary">${statBadges}</div>
           </div>
         </div>
-        <div class="row equipment-grid">${equipmentRows}</div>
+        <div class="equipment-stack">
+          ${equipmentRows || `<div class="muted small">No equipment yet.</div>`}
+          ${equipmentMeta}
+        </div>
         <div class="row">
           <label class="notes">Notes
             <textarea data-k="notes" data-i="${idx}" spellcheck="false" class="form-control">${escapeHtml(p.notes || "")}</textarea>
@@ -872,6 +909,30 @@ function renderEditors() {
   });
 
   pe.querySelectorAll("[data-k]").forEach(el => el.addEventListener("change", onPartyEdit));
+  pe.querySelectorAll("button[data-add-equipment]").forEach(el => el.addEventListener("click", (e) => {
+    const i = Number(e.target.getAttribute("data-add-equipment"));
+    const p = state.party[i];
+    if (!p) return;
+    p.equipment = normalizeEquipmentList(p.equipment, { keepEmpty: true });
+    if (p.equipment.length >= EQUIPMENT_SLOTS) return;
+    p.equipment.push({ ...EMPTY_EQUIPMENT_ENTRY });
+    state.battleSeed = null;
+    saveSetupToStorage(state);
+    renderAll();
+  }));
+  pe.querySelectorAll("button[data-del-equipment]").forEach(el => el.addEventListener("click", (e) => {
+    const i = Number(e.target.getAttribute("data-i"));
+    const slot = Number(e.target.getAttribute("data-del-equipment"));
+    const p = state.party[i];
+    if (!p) return;
+    p.equipment = normalizeEquipmentList(p.equipment, { keepEmpty: true });
+    if (slot >=0 && slot < p.equipment.length) {
+      p.equipment.splice(slot, 1);
+    }
+    state.battleSeed = null;
+    saveSetupToStorage(state);
+    renderAll();
+  }));
   pe.querySelectorAll("button[data-edit-stats]").forEach(el => el.addEventListener("click", (e) => {
     const i = Number(e.target.getAttribute("data-edit-stats"));
     openStatsDialog(i);
@@ -920,7 +981,7 @@ function onPartyEdit(e) {
   const i = Number(el.getAttribute("data-i"));
   if (i < 0 || i >= state.party.length) return;
   const p = state.party[i];
-  if (!Array.isArray(p.equipment)) p.equipment = Array.from({ length: EQUIPMENT_SLOTS }, () => ({ ...EMPTY_EQUIPMENT_ENTRY }));
+  p.equipment = normalizeEquipmentList(p.equipment, { keepEmpty: true });
   if (!Array.isArray(p.spells)) p.spells = Array.from({ length: SPELL_SLOTS }, () => ({ id: "", status: "ready" }));
 
   if (k === "name") p.name = el.value || HERO_NAMES[0];
@@ -935,6 +996,7 @@ function onPartyEdit(e) {
   if (k === "equipment") {
     const slot = Number(el.getAttribute("data-ei"));
     if (slot >= 0 && slot < EQUIPMENT_SLOTS) {
+      while (p.equipment.length <= slot) p.equipment.push({ ...EMPTY_EQUIPMENT_ENTRY });
       const current = normalizeEquipmentEntry(p.equipment[slot]);
       const field = el.getAttribute("data-field");
       if (field === "count") {
@@ -952,6 +1014,7 @@ function onPartyEdit(e) {
         });
         p.equipment[slot] = updated;
       }
+      p.equipment = normalizeEquipmentList(p.equipment, { keepEmpty: true });
       enforceWeaponHandLimit(p);
     }
   }
@@ -1596,13 +1659,18 @@ function openHeroDialogPopulate() {
 }
 
 (function main() {
+  syncPreferredTheme();
   initState();
   initUI();
 
   // override openHeroDialog to repopulate each time
   const oldOpen = openHeroDialog;
   // eslint-disable-next-line no-unused-vars
-  function openHeroDialogWrapped() { openHeroDialogPopulate(); $("heroDialog").showModal(); }
+  function openHeroDialogWrapped() {
+    if (state.party.length >= 4) return;
+    openHeroDialogPopulate();
+    $("heroDialog").showModal();
+  }
   // patch button handler (simpler than rewriting above)
   $("addMember").onclick = openHeroDialogWrapped;
 

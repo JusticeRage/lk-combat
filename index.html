@@ -15,95 +15,125 @@
     </div>
 
     <!-- Hero picker -->
-    <dialog id="heroDialog">
-      <h2 style="margin-top:0;">Choose hero</h2>
-      <div class="row">
-        <label>Hero
-          <select id="heroNameSelect"></select>
-        </label>
-      </div>
-      <div class="dlg-actions">
-        <button id="heroCancel">Cancel</button>
-        <button class="primary" id="heroOk">Add</button>
+    <dialog id="heroDialog" class="lk-dialog">
+      <div class="dialog-content">
+        <div class="dialog-header">
+          <h2 class="h5 mb-0">Choose hero</h2>
+        </div>
+        <div class="dialog-body">
+          <div class="mb-3">
+            <label class="form-label">Hero</label>
+            <select id="heroNameSelect" class="form-select"></select>
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <button class="btn btn-outline-secondary" id="heroCancel">Cancel</button>
+          <button class="btn btn-primary" id="heroOk">Add</button>
+        </div>
       </div>
     </dialog>
 
     <!-- Stats editor -->
-    <dialog id="statsDialog">
-      <h2 style="margin-top:0;">Edit hero stats</h2>
-      <div id="statsDialogHero" class="muted" style="margin-bottom:8px;"></div>
-      <div class="row">
-        <label>Fighting
-          <input type="number" min="0" max="50" id="statFighting">
-        </label>
-        <label>Stealth
-          <input type="number" min="0" max="50" id="statStealth">
-        </label>
-        <label>Lore
-          <input type="number" min="0" max="50" id="statLore">
-        </label>
-        <label>Survival
-          <input type="number" min="0" max="50" id="statSurvival">
-        </label>
-        <label>Charisma
-          <input type="number" min="0" max="50" id="statCharisma">
-        </label>
-      </div>
-      <div class="row" style="margin-top:8px;">
-        <label>Armour
-          <input type="number" min="0" max="50" id="statArmour">
-        </label>
-        <label>Max HP
-          <input type="number" min="1" max="999" id="statMaxHp">
-        </label>
-        <label>HP
-          <input type="number" min="0" max="999" id="statHp">
-        </label>
-      </div>
-      <div class="dlg-actions">
-        <button id="statsCancel">Cancel</button>
-        <button class="primary" id="statsSave">Save</button>
+    <dialog id="statsDialog" class="lk-dialog">
+      <div class="dialog-content">
+        <div class="dialog-header">
+          <h2 class="h5 mb-0">Edit hero stats</h2>
+          <div id="statsDialogHero" class="muted small"></div>
+        </div>
+        <div class="dialog-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Fighting</label>
+              <input type="number" min="0" max="50" id="statFighting" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Stealth</label>
+              <input type="number" min="0" max="50" id="statStealth" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Lore</label>
+              <input type="number" min="0" max="50" id="statLore" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Survival</label>
+              <input type="number" min="0" max="50" id="statSurvival" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Charisma</label>
+              <input type="number" min="0" max="50" id="statCharisma" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Armour</label>
+              <input type="number" min="0" max="50" id="statArmour" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Max HP</label>
+              <input type="number" min="1" max="999" id="statMaxHp" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">HP</label>
+              <input type="number" min="0" max="999" id="statHp" class="form-control">
+            </div>
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <button class="btn btn-outline-secondary" id="statsCancel">Cancel</button>
+          <button class="btn btn-primary" id="statsSave">Save</button>
+        </div>
       </div>
     </dialog>
 
     <!-- Encounter import -->
-    <dialog id="importDialog">
-      <h2 style="margin-top:0;">Import encounter (opponents)</h2>
-      <div class="muted" style="margin-bottom:8px;">
-        Blocks like:<br />
-        <span class="pill">1st Storm Priest</span><br />
-        <span class="pill">3 (4+)</span><br />
-        <span class="pill">4+</span><br />
-        <span class="pill">13</span><br />
-        Optional: <span class="pill">+2 Auto</span> on the attack line (e.g. <span class="pill">7 (3+) +2 Auto</span>)
-      </div>
-      <textarea id="importText" spellcheck="false"></textarea>
-      <div id="importError" class="error" style="margin-top:8px; display:none;"></div>
-      <div class="dlg-actions">
-        <button id="importCancel">Cancel</button>
-        <button class="primary" id="importOk">Import (replace opponents)</button>
+    <dialog id="importDialog" class="lk-dialog">
+      <div class="dialog-content">
+        <div class="dialog-header">
+          <h2 class="h5 mb-1">Import encounter (opponents)</h2>
+        </div>
+        <div class="dialog-body">
+          <div class="muted small" style="margin-bottom:8px;">
+            Blocks like:<br />
+            <span class="pill">1st Storm Priest</span><br />
+            <span class="pill">3 (4+)</span><br />
+            <span class="pill">4+</span><br />
+            <span class="pill">13</span><br />
+            Optional: <span class="pill">+2 Auto</span> on the attack line (e.g. <span class="pill">7 (3+) +2 Auto</span>)
+          </div>
+          <textarea id="importText" spellcheck="false" class="form-control"></textarea>
+          <div id="importError" class="error" style="margin-top:8px; display:none;"></div>
+        </div>
+        <div class="dialog-footer">
+          <button class="btn btn-outline-secondary" id="importCancel">Cancel</button>
+          <button class="btn btn-primary" id="importOk">Import (replace opponents)</button>
+        </div>
       </div>
     </dialog>
 
     <!-- Spell cast dialog -->
-    <dialog id="spellDialog">
-      <h2 style="margin-top:0;">Cast spell</h2>
+    <dialog id="spellDialog" class="lk-dialog">
+      <div class="dialog-content">
+        <div class="dialog-header">
+          <h2 class="h5 mb-0">Cast spell</h2>
+        </div>
+        <div class="dialog-body">
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label class="form-label">Caster</label>
+              <select id="spellCaster" class="form-select"></select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Spell</label>
+              <select id="spellSelect" class="form-select"></select>
+            </div>
+          </div>
 
-      <div class="row">
-        <label>Caster
-          <select id="spellCaster"></select>
-        </label>
-        <label>Spell
-          <select id="spellSelect"></select>
-        </label>
-      </div>
+          <div id="spellTargetArea" class="card" style="margin-top:10px;"></div>
 
-      <div id="spellTargetArea" class="card" style="margin-top:10px;"></div>
-
-      <div id="spellError" class="error" style="margin-top:8px; display:none;"></div>
-      <div class="dlg-actions">
-        <button id="spellCancel">Cancel</button>
-        <button class="primary" id="spellOk">Cast</button>
+          <div id="spellError" class="error" style="margin-top:8px; display:none;"></div>
+        </div>
+        <div class="dialog-footer">
+          <button class="btn btn-outline-secondary" id="spellCancel">Cancel</button>
+          <button class="btn btn-primary" id="spellOk">Cast</button>
+        </div>
       </div>
     </dialog>
 
