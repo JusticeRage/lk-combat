@@ -1,4 +1,5 @@
 import { SPELLS, getSpellById } from "./spells.js";
+import { ITEMS, getItemById } from "./items.js";
 import {
   clampInt, deepClone, fmtDice, nowStamp,
   computeAttackHits, computeEnemyHits,
@@ -25,9 +26,20 @@ const SPELL_SLOTS = 6;
 
 const LS_KEY = "lk_combat_tracker_v3";
 
+const STAT_LABELS = {
+  fighting: "Fighting",
+  stealth: "Stealth",
+  lore: "Lore",
+  survival: "Survival",
+  charisma: "Charisma",
+  armour: "Armour",
+};
+
 const $ = (id) => document.getElementById(id);
 
 const isSpellcaster = (name) => SPELLCASTER_NAMES.has(name);
+
+const EMPTY_EQUIPMENT_ENTRY = { id: "", custom: "", count: 1 };
 
 function escapeHtml(s) {
   return String(s)
@@ -37,8 +49,91 @@ function escapeHtml(s) {
     .replaceAll('"', "&quot;");
 }
 
+function matchItem(text) {
+  if (!text) return { ...EMPTY_EQUIPMENT_ENTRY };
+  const byId = getItemById(text);
+  if (byId) return { id: byId.id, custom: "", count: 1 };
+  const byName = ITEMS.find(it => it.name.toLowerCase() === String(text).toLowerCase());
+  if (byName) return { id: byName.id, custom: "", count: 1 };
+  return { id: "", custom: String(text), count: 1 };
+}
+
+function normalizeEquipmentEntry(raw) {
+  if (!raw) return { ...EMPTY_EQUIPMENT_ENTRY };
+  if (typeof raw === "string") return matchItem(raw);
+  const base = matchItem(raw.id || raw.name || raw.custom);
+  return {
+    id: base.id,
+    custom: typeof raw.custom === "string" ? raw.custom : base.custom,
+    count: clampInt(raw.count ?? 1, 1, 999, 1),
+  };
+}
+
+function getEquipmentItem(entry) {
+  const byId = getItemById(entry?.id);
+  if (byId) return byId;
+  if (!entry?.custom) return null;
+  return ITEMS.find(it => it.name.toLowerCase() === entry.custom.toLowerCase()) || null;
+}
+
+function getEquipmentModifiers(member) {
+  const mods = { fighting: 0, stealth: 0, lore: 0, survival: 0, charisma: 0, armour: 0 };
+  const equipment = Array.isArray(member?.equipment) ? member.equipment : [];
+  for (const raw of equipment) {
+    const entry = normalizeEquipmentEntry(raw);
+    const item = getEquipmentItem(entry);
+    if (!item) continue;
+    const stack = item.countable ? Math.max(1, entry.count || 1) : 1;
+    for (const [k, v] of Object.entries(item.modifiers || {})) {
+      mods[k] = (mods[k] || 0) + (Number(v) || 0) * stack;
+    }
+  }
+  return mods;
+}
+
+function hasEquippedWeapon(member) {
+  const equipment = Array.isArray(member?.equipment) ? member.equipment : [];
+  return equipment.some(raw => {
+    const item = getEquipmentItem(normalizeEquipmentEntry(raw));
+    return item?.type === "weapon";
+  });
+}
+
+function getEffectiveStat(member, key) {
+  const base = member?.[key] || 0;
+  const mods = getEquipmentModifiers(member);
+  return base + (mods[key] || 0);
+}
+
+function getEffectiveArmourScore(member) {
+  const mods = getEquipmentModifiers(member);
+  return getEffectiveArmour(member, mods.armour || 0);
+}
+
+function getEffectiveFightingDice(member) {
+  const fightStat = getEffectiveStat(member, "fighting");
+  const hasWeapon = member.hasWeapon || hasEquippedWeapon(member);
+  const dice = hasWeapon ? fightStat : Math.max(0, fightStat - 1);
+  return { dice, hasWeapon, fightStat };
+}
+
+function describeItem(item, entry) {
+  if (!item) return "No item";
+  const details = [];
+  const mods = Object.entries(item.modifiers || {}).filter(([, v]) => v);
+  if (mods.length) {
+    details.push(mods.map(([k, v]) => `${STAT_LABELS[k] || k}${v >= 0 ? "+" : ""}${v}`).join(", "));
+  }
+  if (item.hands) details.push(item.hands === 2 ? "Two-handed" : "One-handed");
+  if (item.type === "weapon") details.push("Weapon");
+  if (!mods.length && !item.hands && !item.type) details.push("No stat effect");
+  if (item.countable) details.push(`Count: ${entry?.count || 1}`);
+  return details.join(" • ");
+}
+
 function saveSetupToStorage(state) {
   const payload = {
+    silverCoins: state.silverCoins || 0,
     party: state.party.map(p => ({
       name: p.name,
       fighting: p.fighting,
@@ -68,6 +163,8 @@ function loadSetupFromStorage(state) {
     if (!raw) return false;
     const obj = JSON.parse(raw);
     if (!obj || typeof obj !== "object") return false;
+
+    state.silverCoins = clampInt(obj.silverCoins, 0, 999999, 0);
 
     if (Array.isArray(obj.party)) {
       const seen = new Set();
@@ -111,7 +208,7 @@ function newMember(name, seed = null) {
     dead: false,
     actedThisRound: false,
     buffs: [],
-    equipment: Array.from({ length: EQUIPMENT_SLOTS }, () => ""),
+    equipment: Array.from({ length: EQUIPMENT_SLOTS }, () => ({ ...EMPTY_EQUIPMENT_ENTRY })),
     notes: "",
     spells: Array.from({ length: SPELL_SLOTS }, () => ({ id: "", status: "ready" })),
     // spell usage tracked per hero
@@ -130,7 +227,7 @@ function newMember(name, seed = null) {
     health: clampInt(seed.health, 0, 999, 8),
     maxHealth: clampInt(seed.maxHealth, 1, 999, 8),
     equipment: Array.isArray(seed.equipment)
-      ? Array.from({ length: EQUIPMENT_SLOTS }, (_, i) => String(seed.equipment[i] || ""))
+      ? Array.from({ length: EQUIPMENT_SLOTS }, (_, i) => normalizeEquipmentEntry(seed.equipment[i]))
       : base.equipment,
     notes: typeof seed.notes === "string" ? seed.notes : "",
     spells: Array.isArray(seed.spells)
@@ -192,6 +289,7 @@ const state = {
   round: 1,
   turn: "party", // party | enemies
   party: [],
+  silverCoins: 0,
   mobs: [],
   enemyIndex: 0,
   log: [],
@@ -277,8 +375,8 @@ function normalizeForCombat() {
     p.buffs = [];
     p.spellsUsed = {};
     p.equipment = Array.isArray(p.equipment)
-      ? Array.from({ length: EQUIPMENT_SLOTS }, (_, i) => String(p.equipment[i] || ""))
-      : Array.from({ length: EQUIPMENT_SLOTS }, () => "");
+      ? Array.from({ length: EQUIPMENT_SLOTS }, (_, i) => normalizeEquipmentEntry(p.equipment[i]))
+      : Array.from({ length: EQUIPMENT_SLOTS }, () => ({ ...EMPTY_EQUIPMENT_ENTRY }));
     p.spells = Array.isArray(p.spells)
       ? Array.from({ length: SPELL_SLOTS }, (_, i) => ({
         id: p.spells[i]?.id || "",
@@ -360,8 +458,7 @@ function partyAttack(attackerIdx, targetIdx) {
 
   snapshot();
 
-  let diceCount = attacker.fighting;
-  if (!attacker.hasWeapon) diceCount = Math.max(0, diceCount - 1);
+  const { dice: diceCount } = getEffectiveFightingDice(attacker);
 
   const { rolls, hits } = computeAttackHits(diceCount, target.defTarget);
 
@@ -408,7 +505,7 @@ function resolveOneEnemyAttack(victimIdx) {
   pushLog(`[Enemy] ${mob.name} attacks ${victim.name} | rolls=${fmtDice(rolls)} vs ${mob.atkTarget}+ => hits=${hits}${auto ? ` + auto=${auto}` : ""} => damage=${raw}`);
 
   if (raw > 0) {
-    const effArmour = getEffectiveArmour(victim);
+    const effArmour = getEffectiveArmourScore(victim);
     const save = armourSaveRolls(effArmour, raw);
     const final = Math.max(0, raw - save.saved);
 
@@ -520,7 +617,7 @@ function castSpell({ casterIdx, spellId, targets }) {
         pushLog(`        (skipped) invalid/dead ally`);
       } else {
         addBattleArmourBuff(ally, step.amount);
-        pushLog(`        ${ally.name} gains +${step.amount} Armour until end of battle (effective armour now ${getEffectiveArmour(ally)})`);
+        pushLog(`        ${ally.name} gains +${step.amount} Armour until end of battle (effective armour now ${getEffectiveArmourScore(ally)})`);
       }
     }
 
@@ -555,19 +652,51 @@ function castSpell({ casterIdx, spellId, targets }) {
 function renderEditors() {
   const pe = $("partyEditor");
   pe.innerHTML = "";
+
+  let itemList = document.getElementById("itemOptions");
+  if (!itemList) {
+    itemList = document.createElement("datalist");
+    itemList.id = "itemOptions";
+    document.body.appendChild(itemList);
+  }
+  itemList.innerHTML = ITEMS.map(it => `<option value="${escapeHtml(it.name)}"></option>`).join("");
+
+  const partyMeta = document.createElement("div");
+  partyMeta.className = "card";
+  partyMeta.style.marginBottom = "10px";
+  partyMeta.innerHTML = `
+    <div class="row">
+      <label>Silver coins
+        <input type="number" min="0" max="999999" data-k="silverCoins" value="${state.silverCoins || 0}">
+      </label>
+    </div>
+  `;
+  pe.appendChild(partyMeta);
+
   state.party.forEach((p, idx) => {
     const div = document.createElement("div");
     div.className = "card";
     div.style.marginBottom = "10px";
     const equipment = Array.isArray(p.equipment)
-      ? Array.from({ length: EQUIPMENT_SLOTS }, (_, i) => p.equipment[i] || "")
-      : Array.from({ length: EQUIPMENT_SLOTS }, () => "");
+      ? Array.from({ length: EQUIPMENT_SLOTS }, (_, i) => normalizeEquipmentEntry(p.equipment[i]))
+      : Array.from({ length: EQUIPMENT_SLOTS }, () => ({ ...EMPTY_EQUIPMENT_ENTRY }));
 
-    const equipmentRows = equipment.map((eq, slot) => `
-      <label class="equip-label">Item ${slot + 1}
-        <input type="text" data-k="equipment" data-ei="${slot}" data-i="${idx}" value="${escapeHtml(eq)}" placeholder="Empty">
-      </label>
-    `).join("");
+    const equipmentRows = equipment.map((eq, slot) => {
+      const item = getEquipmentItem(eq);
+      return `
+      <div class="equip-row">
+        <label class="equip-label">Item ${slot + 1}
+          <input type="text" list="itemOptions" data-k="equipment" data-field="name" data-ei="${slot}" data-i="${idx}" value="${escapeHtml(eq.custom || item?.name || "")}" placeholder="Empty">
+        </label>
+        ${item?.countable ? `
+          <label class="equip-count">Count
+            <input type="number" min="1" max="999" data-k="equipment" data-field="count" data-ei="${slot}" data-i="${idx}" value="${eq.count || 1}">
+          </label>
+        ` : ""}
+        <div class="muted equip-help">${escapeHtml(item ? describeItem(item, eq) : (eq.custom ? "Custom item" : "No item"))}</div>
+      </div>
+    `;
+    }).join("");
 
     const spellRows = [];
     if (isSpellcaster(p.name)) {
@@ -626,9 +755,7 @@ function renderEditors() {
           <textarea data-k="notes" data-i="${idx}" spellcheck="false">${escapeHtml(p.notes || "")}</textarea>
         </label>
       </div>
-      ${isSpellcaster(p.name)
-        ? `<div class="card spell-card">${spellRows.join("")}</div>`
-        : `<div class="muted">Not a spellcaster.</div>`}
+      ${isSpellcaster(p.name) ? `<div class="card spell-card">${spellRows.join("")}</div>` : ""}
     `;
     pe.appendChild(div);
   });
@@ -654,7 +781,7 @@ function renderEditors() {
     me.appendChild(div);
   });
 
-  pe.querySelectorAll("input,select,textarea").forEach(el => el.addEventListener("change", onPartyEdit));
+  pe.querySelectorAll("[data-k]").forEach(el => el.addEventListener("change", onPartyEdit));
   pe.querySelectorAll("button[data-del-party]").forEach(el => el.addEventListener("click", (e) => {
     const i = Number(e.target.getAttribute("data-del-party"));
     state.party.splice(i, 1);
@@ -686,11 +813,20 @@ function enforceUniquePartyNames() {
 
 function onPartyEdit(e) {
   const el = e.target;
-  const i = Number(el.getAttribute("data-i"));
   const k = el.getAttribute("data-k");
+
+  if (k === "silverCoins") {
+    state.silverCoins = clampInt(el.value, 0, 999999, state.silverCoins || 0);
+    state.battleSeed = null;
+    saveSetupToStorage(state);
+    renderAll();
+    return;
+  }
+
+  const i = Number(el.getAttribute("data-i"));
   if (i < 0 || i >= state.party.length) return;
   const p = state.party[i];
-  if (!Array.isArray(p.equipment)) p.equipment = Array.from({ length: EQUIPMENT_SLOTS }, () => "");
+  if (!Array.isArray(p.equipment)) p.equipment = Array.from({ length: EQUIPMENT_SLOTS }, () => ({ ...EMPTY_EQUIPMENT_ENTRY }));
   if (!Array.isArray(p.spells)) p.spells = Array.from({ length: SPELL_SLOTS }, () => ({ id: "", status: "ready" }));
 
   if (k === "name") p.name = el.value || HERO_NAMES[0];
@@ -705,7 +841,18 @@ function onPartyEdit(e) {
   if (k === "hasWeapon") p.hasWeapon = (el.value === "true");
   if (k === "equipment") {
     const slot = Number(el.getAttribute("data-ei"));
-    if (slot >= 0 && slot < EQUIPMENT_SLOTS) p.equipment[slot] = el.value || "";
+    if (slot >= 0 && slot < EQUIPMENT_SLOTS) {
+      const current = normalizeEquipmentEntry(p.equipment[slot]);
+      const field = el.getAttribute("data-field");
+      if (field === "count") {
+        current.count = clampInt(el.value, 1, 999, current.count || 1);
+      } else {
+        const parsed = matchItem(el.value);
+        current.id = parsed.id;
+        current.custom = parsed.custom;
+      }
+      p.equipment[slot] = current;
+    }
   }
   if (k === "notes") p.notes = el.value || "";
   if (k === "spellId") {
@@ -761,12 +908,18 @@ function renderTables() {
       const acted = (state.phase === "combat" && state.turn === "party")
         ? (p.actedThisRound ? `<span class="pill">Acted</span>` : `<span class="pill">Ready</span>`)
         : "";
-      const armourEff = getEffectiveArmour(p);
+      const mods = getEquipmentModifiers(p);
+      const armourEff = getEffectiveArmour(p, mods.armour || 0);
       const armourTag = (armourEff !== (p.armour||0)) ? ` <span class="pill">Armour ${armourEff}</span>` : "";
+      const { dice: fightingDice, hasWeapon } = getEffectiveFightingDice(p);
+      const baseDice = p.hasWeapon ? (p.fighting || 0) : Math.max(0, (p.fighting || 0) - 1);
+      const fightingTag = (fightingDice !== baseDice)
+        ? ` <span class="pill">Base ${baseDice}</span>`
+        : (!hasWeapon ? " (no weapon -1)" : "");
       return `
         <tr class="${(p.dead||p.health<=0) ? "dead" : ""}">
           <td>${p.name} ${acted}${armourTag}</td>
-          <td>${p.fighting}${p.hasWeapon ? "" : " (no weapon -1)"}</td>
+          <td>${fightingDice}${fightingTag}</td>
           <td>${p.armour}</td>
           <td>${Math.max(0,p.health)}/${p.maxHealth}</td>
         </tr>
@@ -1288,6 +1441,7 @@ function initState() {
   if (!loadSetupFromStorage(state)) {
     state.party = [ newMember("Akihiro of Chalice", { fighting: 4, armour: 0, hasWeapon: true, health: 8, maxHealth: 8 }) ];
     state.mobs = [ { name: "Goblin", atkDice: 4, atkTarget: 5, auto: 0, defTarget: 4, health: 6, maxHealth: 6, dead: false } ];
+    state.silverCoins = 0;
     saveSetupToStorage(state);
   }
 }
