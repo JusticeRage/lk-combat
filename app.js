@@ -15,6 +15,11 @@ const HERO_NAMES = [
   "Brash",
 ];
 
+const SPELLCASTER_NAMES = new Set([
+  "Akihiro of Chalice",
+  "Lord Ti’quon",
+]);
+
 const LS_KEY = "lk_combat_tracker_v3";
 
 const $ = (id) => document.getElementById(id);
@@ -398,6 +403,7 @@ function resolveAllEnemyAttacks(victimIdx) {
 // --- Spell casting engine (small) ---
 function canCastSpell(caster, spell) {
   if (state.phase !== "combat" || state.turn !== "party") return { ok: false, reason: "Not on party turn." };
+  if (!SPELLCASTER_NAMES.has(caster.name)) return { ok: false, reason: "This hero cannot cast spells." };
   if (caster.dead || caster.health <= 0) return { ok: false, reason: "Caster is dead." };
   if (caster.actedThisRound) return { ok: false, reason: "Caster already acted this round." };
   if (spell.oncePerBattle && caster.spellsUsed?.[spell.id]) return { ok: false, reason: "Spell already used this battle." };
@@ -780,8 +786,10 @@ function openSpellDialog() {
   state.party.forEach((p, idx) => {
     const opt = document.createElement("option");
     opt.value = String(idx);
-    opt.textContent = `${p.name}${p.actedThisRound ? " (acted)" : ""}${(p.dead||p.health<=0) ? " (dead)" : ""}`;
-    opt.disabled = !!(p.dead || p.health<=0 || p.actedThisRound);
+    const allowedCaster = SPELLCASTER_NAMES.has(p.name);
+    const suffix = `${allowedCaster ? "" : " (cannot cast)"}${p.actedThisRound ? " (acted)" : ""}${(p.dead||p.health<=0) ? " (dead)" : ""}`;
+    opt.textContent = `${p.name}${suffix}`;
+    opt.disabled = !!(!allowedCaster || p.dead || p.health<=0 || p.actedThisRound);
     casterSel.appendChild(opt);
   });
 
@@ -976,7 +984,9 @@ function initUI() {
     partyAttack(Number($("playerAttacker").value), Number($("playerTarget").value));
   });
   $("playerSpell").addEventListener("click", openSpellDialog);
-  $("playerSkip").addEventListener("click", endPartyTurnManual);
+  $("playerSkip").addEventListener("click", () => {
+    if (confirm("End the party's turn?")) endPartyTurnManual();
+  });
 
   $("enemyResolveOne").addEventListener("click", () => resolveOneEnemyAttack(Number($("enemyVictim").value)));
   $("enemyResolveAll").addEventListener("click", () => resolveAllEnemyAttacks(Number($("enemyVictim").value)));
