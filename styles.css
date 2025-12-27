@@ -33,8 +33,11 @@ th { font-size: 12px; opacity: .9; }
 .equip-label input { width: 100%; }
 .equip-count input { width: 120px; }
 .equip-help { min-height: 18px; }
+.equip-equipped { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .notes { flex: 1 1 100%; }
 .notes textarea { width: 100%; min-height: 80px; }
+.stat-summary { align-items: center; }
+.stat-pill { margin-right: 6px; white-space: nowrap; }
 .spell-card { background: rgba(127,127,127,.05); }
 .spell-row label { flex: 1 1 200px; min-width: 200px; }
 dialog { border: 1px solid rgba(127,127,127,.35); border-radius: 12px; padding: 12px; max-width: 720px; width: calc(100vw - 32px); }

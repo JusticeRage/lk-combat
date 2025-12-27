@@ -35,11 +35,19 @@ const STAT_LABELS = {
   armour: "Armour",
 };
 
+const STAT_ICONS = {
+  fighting: "⚔️",
+  stealth: "🥷🏻",
+  lore: "📚",
+  survival: "🏕️",
+  charisma: "💬",
+};
+
 const $ = (id) => document.getElementById(id);
 
 const isSpellcaster = (name) => SPELLCASTER_NAMES.has(name);
 
-const EMPTY_EQUIPMENT_ENTRY = { id: "", custom: "", count: 1 };
+const EMPTY_EQUIPMENT_ENTRY = { id: "", custom: "", count: 1, equipped: null };
 
 function escapeHtml(s) {
   return String(s)
@@ -52,20 +60,24 @@ function escapeHtml(s) {
 function matchItem(text) {
   if (!text) return { ...EMPTY_EQUIPMENT_ENTRY };
   const byId = getItemById(text);
-  if (byId) return { id: byId.id, custom: "", count: 1 };
+  if (byId) return { id: byId.id, custom: "", count: 1, equipped: null };
   const byName = ITEMS.find(it => it.name.toLowerCase() === String(text).toLowerCase());
-  if (byName) return { id: byName.id, custom: "", count: 1 };
-  return { id: "", custom: String(text), count: 1 };
+  if (byName) return { id: byName.id, custom: "", count: 1, equipped: null };
+  return { id: "", custom: String(text), count: 1, equipped: null };
 }
 
 function normalizeEquipmentEntry(raw) {
   if (!raw) return { ...EMPTY_EQUIPMENT_ENTRY };
   if (typeof raw === "string") return matchItem(raw);
   const base = matchItem(raw.id || raw.name || raw.custom);
+  const item = getItemById(base.id);
+  let equipped = (raw.equipped === null || raw.equipped === undefined) ? null : !!raw.equipped;
+  if (equipped === null) equipped = item?.type === "weapon" ? true : false;
   return {
     id: base.id,
     custom: typeof raw.custom === "string" ? raw.custom : base.custom,
     count: clampInt(raw.count ?? 1, 1, 999, 1),
+    equipped,
   };
 }
 
@@ -83,6 +95,7 @@ function getEquipmentModifiers(member) {
     const entry = normalizeEquipmentEntry(raw);
     const item = getEquipmentItem(entry);
     if (!item) continue;
+    if (item.type === "weapon" && !entry.equipped) continue;
     const stack = item.countable ? Math.max(1, entry.count || 1) : 1;
     for (const [k, v] of Object.entries(item.modifiers || {})) {
       mods[k] = (mods[k] || 0) + (Number(v) || 0) * stack;
@@ -91,11 +104,30 @@ function getEquipmentModifiers(member) {
   return mods;
 }
 
+function enforceWeaponHandLimit(member) {
+  if (!Array.isArray(member?.equipment)) return;
+  let handsUsed = 0;
+  member.equipment = member.equipment.map(raw => {
+    const entry = normalizeEquipmentEntry(raw);
+    const item = getEquipmentItem(entry);
+    if (item?.type === "weapon") {
+      const hands = item.hands === 2 ? 2 : 1;
+      if (entry.equipped && handsUsed + hands > 2) {
+        entry.equipped = false;
+      } else if (entry.equipped) {
+        handsUsed += hands;
+      }
+    }
+    return entry;
+  });
+}
+
 function hasEquippedWeapon(member) {
   const equipment = Array.isArray(member?.equipment) ? member.equipment : [];
   return equipment.some(raw => {
-    const item = getEquipmentItem(normalizeEquipmentEntry(raw));
-    return item?.type === "weapon";
+    const entry = normalizeEquipmentEntry(raw);
+    const item = getEquipmentItem(entry);
+    return item?.type === "weapon" && entry.equipped;
   });
 }
 
@@ -112,9 +144,28 @@ function getEffectiveArmourScore(member) {
 
 function getEffectiveFightingDice(member) {
   const fightStat = getEffectiveStat(member, "fighting");
-  const hasWeapon = member.hasWeapon || hasEquippedWeapon(member);
+  const hasWeapon = hasEquippedWeapon(member);
   const dice = hasWeapon ? fightStat : Math.max(0, fightStat - 1);
   return { dice, hasWeapon, fightStat };
+}
+
+function computeDisplayedStats(member) {
+  const mods = getEquipmentModifiers(member);
+  const stats = {};
+  for (const key of ["fighting", "stealth", "lore", "survival", "charisma", "armour"]) {
+    const base = member?.[key] || 0;
+    let modified = base + (mods[key] || 0);
+    if (key === "armour") modified = getEffectiveArmour(member, mods.armour || 0);
+    if (key === "fighting") modified = hasEquippedWeapon(member) ? modified : Math.max(0, modified - 1);
+    stats[key] = { base, modified };
+  }
+  return stats;
+}
+
+function formatStatBadge(key, stat) {
+  const icon = STAT_ICONS[key] ? `${STAT_ICONS[key]} ` : "";
+  const label = STAT_LABELS[key] || key;
+  return `${icon}${label}: ${stat.base} (${stat.modified})`;
 }
 
 function describeItem(item, entry) {
@@ -126,6 +177,7 @@ function describeItem(item, entry) {
   }
   if (item.hands) details.push(item.hands === 2 ? "Two-handed" : "One-handed");
   if (item.type === "weapon") details.push("Weapon");
+  if (item.type === "weapon") details.push(entry?.equipped ? "Equipped" : "Unequipped");
   if (!mods.length && !item.hands && !item.type) details.push("No stat effect");
   if (item.countable) details.push(`Count: ${entry?.count || 1}`);
   return details.join(" • ");
@@ -142,7 +194,6 @@ function saveSetupToStorage(state) {
       survival: p.survival,
       charisma: p.charisma,
       armour: p.armour,
-      hasWeapon: !!p.hasWeapon,
       health: p.health,
       maxHealth: p.maxHealth,
       equipment: p.equipment,
@@ -202,7 +253,6 @@ function newMember(name, seed = null) {
     survival: 0,
     charisma: 0,
     armour: 0,
-    hasWeapon: true,
     health: 8,
     maxHealth: 8,
     dead: false,
@@ -215,7 +265,7 @@ function newMember(name, seed = null) {
     spellsUsed: {} // { spellId: true }
   };
   if (!seed) return base;
-  return {
+  const enriched = {
     ...base,
     fighting: clampInt(seed.fighting, 0, 99, 3),
     stealth: clampInt(seed.stealth, 0, 99, 0),
@@ -223,7 +273,6 @@ function newMember(name, seed = null) {
     survival: clampInt(seed.survival, 0, 99, 0),
     charisma: clampInt(seed.charisma, 0, 99, 0),
     armour: clampInt(seed.armour, 0, 99, 0),
-    hasWeapon: !!seed.hasWeapon,
     health: clampInt(seed.health, 0, 999, 8),
     maxHealth: clampInt(seed.maxHealth, 1, 999, 8),
     equipment: Array.isArray(seed.equipment)
@@ -237,6 +286,8 @@ function newMember(name, seed = null) {
       }))
       : base.spells,
   };
+  enforceWeaponHandLimit(enriched);
+  return enriched;
 }
 
 function newMob() {
@@ -370,13 +421,13 @@ function normalizeForCombat() {
     p.survival = clampInt(p.survival, 0, 99, p.survival);
     p.charisma = clampInt(p.charisma, 0, 99, p.charisma);
     p.armour = clampInt(p.armour, 0, 99, p.armour);
-    p.hasWeapon = !!p.hasWeapon;
     p.actedThisRound = false;
     p.buffs = [];
     p.spellsUsed = {};
     p.equipment = Array.isArray(p.equipment)
       ? Array.from({ length: EQUIPMENT_SLOTS }, (_, i) => normalizeEquipmentEntry(p.equipment[i]))
       : Array.from({ length: EQUIPMENT_SLOTS }, () => ({ ...EMPTY_EQUIPMENT_ENTRY }));
+    enforceWeaponHandLimit(p);
     p.spells = Array.isArray(p.spells)
       ? Array.from({ length: SPELL_SLOTS }, (_, i) => ({
         id: p.spells[i]?.id || "",
@@ -677,12 +728,21 @@ function renderEditors() {
     const div = document.createElement("div");
     div.className = "card";
     div.style.marginBottom = "10px";
+    enforceWeaponHandLimit(p);
     const equipment = Array.isArray(p.equipment)
       ? Array.from({ length: EQUIPMENT_SLOTS }, (_, i) => normalizeEquipmentEntry(p.equipment[i]))
       : Array.from({ length: EQUIPMENT_SLOTS }, () => ({ ...EMPTY_EQUIPMENT_ENTRY }));
+    const statBadges = (() => {
+      const stats = computeDisplayedStats(p);
+      return ["fighting", "stealth", "lore", "survival", "charisma", "armour"]
+        .map(k => `<span class="pill stat-pill">${escapeHtml(formatStatBadge(k, stats[k]))}</span>`)
+        .join("");
+    })();
 
-    const equipmentRows = equipment.map((eq, slot) => {
+    const equipmentRows = equipment.map((eqRaw, slot) => {
+      const eq = normalizeEquipmentEntry(eqRaw);
       const item = getEquipmentItem(eq);
+      const isWeapon = item?.type === "weapon";
       return `
       <div class="equip-row">
         <label class="equip-label">Item ${slot + 1}
@@ -691,6 +751,12 @@ function renderEditors() {
         ${item?.countable ? `
           <label class="equip-count">Count
             <input type="number" min="1" max="999" data-k="equipment" data-field="count" data-ei="${slot}" data-i="${idx}" value="${eq.count || 1}">
+          </label>
+        ` : ""}
+        ${isWeapon ? `
+          <label class="equip-equipped">
+            <span>Equipped</span>
+            <input type="checkbox" data-k="equipment" data-field="equipped" data-ei="${slot}" data-i="${idx}" ${eq.equipped ? "checked" : ""}>
           </label>
         ` : ""}
         <div class="muted equip-help">${escapeHtml(item ? describeItem(item, eq) : (eq.custom ? "Custom item" : "No item"))}</div>
@@ -741,14 +807,9 @@ function renderEditors() {
         <label>Armour <input type="number" min="0" max="50" data-k="armour" data-i="${idx}" value="${p.armour}"></label>
         <label>Max HP <input type="number" min="1" max="999" data-k="maxHealth" data-i="${idx}" value="${p.maxHealth}"></label>
         <label>HP <input type="number" min="0" max="999" data-k="health" data-i="${idx}" value="${p.health}"></label>
-        <label class="nowrap">Has weapon
-          <select data-k="hasWeapon" data-i="${idx}">
-            <option value="true" ${p.hasWeapon ? "selected" : ""}>Yes</option>
-            <option value="false" ${!p.hasWeapon ? "selected" : ""}>No</option>
-          </select>
-        </label>
         <button data-del-party="${idx}">Remove</button>
       </div>
+      <div class="row stat-summary">${statBadges}</div>
       <div class="row equipment-grid">${equipmentRows}</div>
       <div class="row">
         <label class="notes">Notes
@@ -838,7 +899,6 @@ function onPartyEdit(e) {
   if (k === "armour") p.armour = clampInt(el.value, 0, 50, p.armour);
   if (k === "maxHealth") { p.maxHealth = clampInt(el.value, 1, 999, p.maxHealth); p.health = Math.min(p.health, p.maxHealth); }
   if (k === "health") p.health = clampInt(el.value, 0, 999, p.health);
-  if (k === "hasWeapon") p.hasWeapon = (el.value === "true");
   if (k === "equipment") {
     const slot = Number(el.getAttribute("data-ei"));
     if (slot >= 0 && slot < EQUIPMENT_SLOTS) {
@@ -846,12 +906,20 @@ function onPartyEdit(e) {
       const field = el.getAttribute("data-field");
       if (field === "count") {
         current.count = clampInt(el.value, 1, 999, current.count || 1);
+        p.equipment[slot] = current;
+      } else if (field === "equipped") {
+        current.equipped = !!el.checked;
+        p.equipment[slot] = current;
       } else {
         const parsed = matchItem(el.value);
-        current.id = parsed.id;
-        current.custom = parsed.custom;
+        const updated = normalizeEquipmentEntry({
+          id: parsed.id,
+          custom: parsed.custom,
+          count: current.count,
+        });
+        p.equipment[slot] = updated;
       }
-      p.equipment[slot] = current;
+      enforceWeaponHandLimit(p);
     }
   }
   if (k === "notes") p.notes = el.value || "";
@@ -905,29 +973,25 @@ function renderTables() {
     pt.innerHTML = `<div class="muted">No party members.</div>`;
   } else {
     const rows = state.party.map(p => {
+      enforceWeaponHandLimit(p);
       const acted = (state.phase === "combat" && state.turn === "party")
         ? (p.actedThisRound ? `<span class="pill">Acted</span>` : `<span class="pill">Ready</span>`)
         : "";
-      const mods = getEquipmentModifiers(p);
-      const armourEff = getEffectiveArmour(p, mods.armour || 0);
-      const armourTag = (armourEff !== (p.armour||0)) ? ` <span class="pill">Armour ${armourEff}</span>` : "";
-      const { dice: fightingDice, hasWeapon } = getEffectiveFightingDice(p);
-      const baseDice = p.hasWeapon ? (p.fighting || 0) : Math.max(0, (p.fighting || 0) - 1);
-      const fightingTag = (fightingDice !== baseDice)
-        ? ` <span class="pill">Base ${baseDice}</span>`
-        : (!hasWeapon ? " (no weapon -1)" : "");
+      const stats = computeDisplayedStats(p);
+      const statLine = ["fighting", "stealth", "lore", "survival", "charisma", "armour"]
+        .map(k => `<span class="pill stat-pill">${escapeHtml(formatStatBadge(k, stats[k]))}</span>`)
+        .join(" ");
       return `
         <tr class="${(p.dead||p.health<=0) ? "dead" : ""}">
-          <td>${p.name} ${acted}${armourTag}</td>
-          <td>${fightingDice}${fightingTag}</td>
-          <td>${p.armour}</td>
+          <td>${p.name} ${acted}</td>
+          <td>${statLine}</td>
           <td>${Math.max(0,p.health)}/${p.maxHealth}</td>
         </tr>
       `;
     }).join("");
     pt.innerHTML = `
       <table>
-        <thead><tr><th>Name</th><th>Fighting</th><th>Armour</th><th>HP</th></tr></thead>
+        <thead><tr><th>Name</th><th>Stats</th><th>HP</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
@@ -1439,7 +1503,7 @@ function initUI() {
 // --- Init ---
 function initState() {
   if (!loadSetupFromStorage(state)) {
-    state.party = [ newMember("Akihiro of Chalice", { fighting: 4, armour: 0, hasWeapon: true, health: 8, maxHealth: 8 }) ];
+    state.party = [ newMember("Akihiro of Chalice", { fighting: 4, armour: 0, health: 8, maxHealth: 8 }) ];
     state.mobs = [ { name: "Goblin", atkDice: 4, atkTarget: 5, auto: 0, defTarget: 4, health: 6, maxHealth: 6, dead: false } ];
     state.silverCoins = 0;
     saveSetupToStorage(state);
