@@ -6,9 +6,16 @@ h2 { margin: 0 0 8px 0; font-size: 17px; font-weight: 600; }
 .grid { display: grid; gap: 12px; }
 .two { grid-template-columns: 1fr 1fr; }
 .card { border: 1px solid #e3e6ea; border-radius: 10px; padding: 12px; background: #fff; }
-.panel { box-shadow: 0 3px 14px rgba(0, 0, 0, 0.05); border-radius: 10px; border: 1px solid #e3e6ea; }
-.panel-heading { border-bottom: 1px solid #e3e6ea; background: #fdfefe; border-radius: 10px 10px 0 0 !important; }
-.panel-body { background: #fff; }
+.panel { box-shadow: 0 3px 14px rgba(0, 0, 0, 0.05); border-radius: 10px; border: 1px solid #e3e6ea; background: #fff; }
+.panel-heading { border-bottom: 1px solid #e3e6ea; background: #fdfefe; border-radius: 10px 10px 0 0 !important; padding: 12px 14px; }
+.panel-body { background: #fff; padding: 12px 14px; }
+.panel-title { margin: 0; font-size: 17px; font-weight: 600; }
+.btn-default { color: #0f172a; background: #fff; border-color: #d5dae0; }
+.btn-default:hover, .btn-default:focus { color: #0f172a; background: #f8fafc; border-color: #cbd5e1; }
+.btn-default:active { color: #0f172a; background: #e2e8f0; border-color: #cbd5e1; }
+
+.input-sm { padding: 6px 10px; font-size: 13px; border-radius: 8px; }
+.form-control.input-sm { height: auto; padding: 6px 10px; font-size: 13px; }
 label { display: grid; gap: 4px; font-size: 12px; opacity: .9; }
 input, select, button, textarea { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(127,127,127,.35); background: transparent; }
 input[type="number"] { width: 92px; }
