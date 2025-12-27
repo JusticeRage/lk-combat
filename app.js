@@ -16,6 +16,15 @@ const HERO_NAMES = [
   "Brash",
 ];
 
+const HERO_IMAGES = {
+  "Sar Jessica Dayne": "./img/jessica.png",
+  "Lord Ti’quon": "./img/tiquon.png",
+  "Tasha": "./img/tasha.png",
+  "Amelia Pass-Dayne": "./img/amelia.png",
+  "Akihiro of Chalice": "./img/akihiro.png",
+  "Brash": "./img/brash.png",
+};
+
 const SPELLCASTER_NAMES = new Set([
   "Amelia Pass-Dayne",
   "Lord Ti’quon",
@@ -58,6 +67,8 @@ const formatSpellOptionLabel = (spell) => {
 };
 
 const isSpellcaster = (name) => SPELLCASTER_NAMES.has(name);
+
+const getHeroImage = (name) => HERO_IMAGES[name] || "https://via.placeholder.com/120x120?text=Hero";
 
 const EMPTY_EQUIPMENT_ENTRY = { id: "", custom: "", count: 1, equipped: null };
 
@@ -726,21 +737,21 @@ function renderEditors() {
   itemList.innerHTML = ITEMS.map(it => `<option value="${escapeHtml(it.name)}"></option>`).join("");
 
   const partyMeta = document.createElement("div");
-  partyMeta.className = "card";
-  partyMeta.style.marginBottom = "10px";
+  partyMeta.className = "panel panel-default hero-card";
   partyMeta.innerHTML = `
-    <div class="row">
-      <label>Silver coins
-        <input type="number" min="0" max="999999" data-k="silverCoins" value="${state.silverCoins || 0}">
-      </label>
+    <div class="panel-body">
+      <div class="row">
+        <label>Silver coins
+          <input type="number" class="form-control input-sm" min="0" max="999999" data-k="silverCoins" value="${state.silverCoins || 0}">
+        </label>
+      </div>
     </div>
   `;
   pe.appendChild(partyMeta);
 
   state.party.forEach((p, idx) => {
     const div = document.createElement("div");
-    div.className = "card";
-    div.style.marginBottom = "10px";
+    div.className = "panel panel-default hero-card";
     enforceWeaponHandLimit(p);
     const equipment = Array.isArray(p.equipment)
       ? Array.from({ length: EQUIPMENT_SLOTS }, (_, i) => normalizeEquipmentEntry(p.equipment[i]))
@@ -761,11 +772,11 @@ function renderEditors() {
       return `
       <div class="equip-row">
         <label class="equip-label">Item ${slot + 1}
-          <input type="text" list="itemOptions" data-k="equipment" data-field="name" data-ei="${slot}" data-i="${idx}" value="${escapeHtml(eq.custom || item?.name || "")}" placeholder="Empty">
+          <input type="text" class="form-control input-sm" list="itemOptions" data-k="equipment" data-field="name" data-ei="${slot}" data-i="${idx}" value="${escapeHtml(eq.custom || item?.name || "")}" placeholder="Empty">
         </label>
         ${item?.countable ? `
           <label class="equip-count">Count
-            <input type="number" min="1" max="999" data-k="equipment" data-field="count" data-ei="${slot}" data-i="${idx}" value="${eq.count || 1}">
+            <input type="number" class="form-control input-sm" min="1" max="999" data-k="equipment" data-field="count" data-ei="${slot}" data-i="${idx}" value="${eq.count || 1}">
           </label>
         ` : ""}
         ${isWeapon ? `
@@ -789,13 +800,13 @@ function renderEditors() {
         spellRows.push(`
           <div class="row spell-row">
             <label>Spell ${i + 1}
-              <select data-k="spellId" data-si="${i}" data-i="${idx}">
+              <select data-k="spellId" data-si="${i}" data-i="${idx}" class="form-control input-sm">
                 <option value="">— None —</option>
                 ${SPELLS.map(sp => `<option value="${sp.id}" ${entry.id === sp.id ? "selected" : ""}>${escapeHtml(formatSpellOptionLabel(sp))}</option>`).join("")}
               </select>
             </label>
             <label>Status
-              <select data-k="spellStatus" data-si="${i}" data-i="${idx}">
+              <select data-k="spellStatus" data-si="${i}" data-i="${idx}" class="form-control input-sm">
                 <option value="ready" ${entry.status !== "exhausted" ? "selected" : ""}>Charged</option>
                 <option value="exhausted" ${entry.status === "exhausted" ? "selected" : ""}>Exhausted</option>
               </select>
@@ -806,23 +817,34 @@ function renderEditors() {
     }
 
     div.innerHTML = `
-      <div class="row hero-header">
-        <label>Name
-          <select data-k="name" data-i="${idx}">
-            ${HERO_NAMES.map(n => `<option value="${escapeHtml(n)}" ${p.name===n ? "selected":""}>${escapeHtml(n)}</option>`).join("")}
-          </select>
-        </label>
-        <div class="stat-summary">${statBadges}</div>
-        <button data-edit-stats="${idx}">Edit stats</button>
-        <button data-del-party="${idx}">Remove</button>
+      <div class="panel-body">
+        <div class="hero-heading">
+          <img src="${getHeroImage(p.name)}" alt="${escapeHtml(p.name)} portrait" class="hero-avatar">
+          <div style="flex:1;">
+            <div class="row hero-top-row">
+              <div class="col-sm-6">
+                <label>Name
+                  <select data-k="name" data-i="${idx}" class="form-control input-sm">
+                    ${HERO_NAMES.map(n => `<option value="${escapeHtml(n)}" ${p.name===n ? "selected":""}>${escapeHtml(n)}</option>`).join("")}
+                  </select>
+                </label>
+              </div>
+              <div class="col-sm-6 text-right">
+                <button class="btn btn-link btn-sm" data-edit-stats="${idx}">Edit stats</button>
+                <button class="btn btn-default btn-sm" data-del-party="${idx}">Remove</button>
+              </div>
+            </div>
+            <div class="stat-summary">${statBadges}</div>
+          </div>
+        </div>
+        <div class="row equipment-grid">${equipmentRows}</div>
+        <div class="row">
+          <label class="notes">Notes
+            <textarea data-k="notes" data-i="${idx}" spellcheck="false" class="form-control">${escapeHtml(p.notes || "")}</textarea>
+          </label>
+        </div>
+        ${isSpellcaster(p.name) ? `<div class="panel panel-default spell-card" style="margin-top:10px;"><div class="panel-body">${spellRows.join("")}</div></div>` : ""}
       </div>
-      <div class="row equipment-grid">${equipmentRows}</div>
-      <div class="row">
-        <label class="notes">Notes
-          <textarea data-k="notes" data-i="${idx}" spellcheck="false">${escapeHtml(p.notes || "")}</textarea>
-        </label>
-      </div>
-      ${isSpellcaster(p.name) ? `<div class="card spell-card">${spellRows.join("")}</div>` : ""}
     `;
     pe.appendChild(div);
   });
@@ -831,18 +853,19 @@ function renderEditors() {
   me.innerHTML = "";
   state.mobs.forEach((m, idx) => {
     const div = document.createElement("div");
-    div.className = "card";
-    div.style.marginBottom = "10px";
+    div.className = "panel panel-default hero-card";
     div.innerHTML = `
-      <div class="row">
-        <label>Name <input type="text" data-mk="name" data-mi="${idx}" value="${escapeHtml(m.name)}"></label>
-        <label>Atk dice <input type="number" min="0" max="50" data-mk="atkDice" data-mi="${idx}" value="${m.atkDice}"></label>
-        <label>Atk target <input type="number" min="2" max="6" data-mk="atkTarget" data-mi="${idx}" value="${m.atkTarget}"></label>
-        <label>Auto dmg <input type="number" min="0" max="50" data-mk="auto" data-mi="${idx}" value="${m.auto}"></label>
-        <label>Def target <input type="number" min="2" max="6" data-mk="defTarget" data-mi="${idx}" value="${m.defTarget}"></label>
-        <label>Max HP <input type="number" min="1" max="999" data-mk="maxHealth" data-mi="${idx}" value="${m.maxHealth}"></label>
-        <label>HP <input type="number" min="0" max="999" data-mk="health" data-mi="${idx}" value="${m.health}"></label>
-        <button data-del-mob="${idx}">Remove</button>
+      <div class="panel-body">
+        <div class="row">
+          <label>Name <input type="text" class="form-control input-sm" data-mk="name" data-mi="${idx}" value="${escapeHtml(m.name)}"></label>
+          <label>Atk dice <input type="number" class="form-control input-sm" min="0" max="50" data-mk="atkDice" data-mi="${idx}" value="${m.atkDice}"></label>
+          <label>Atk target <input type="number" class="form-control input-sm" min="2" max="6" data-mk="atkTarget" data-mi="${idx}" value="${m.atkTarget}"></label>
+          <label>Auto dmg <input type="number" class="form-control input-sm" min="0" max="50" data-mk="auto" data-mi="${idx}" value="${m.auto}"></label>
+          <label>Def target <input type="number" class="form-control input-sm" min="2" max="6" data-mk="defTarget" data-mi="${idx}" value="${m.defTarget}"></label>
+          <label>Max HP <input type="number" class="form-control input-sm" min="1" max="999" data-mk="maxHealth" data-mi="${idx}" value="${m.maxHealth}"></label>
+          <label>HP <input type="number" class="form-control input-sm" min="0" max="999" data-mk="health" data-mi="${idx}" value="${m.health}"></label>
+          <button class="btn btn-default btn-sm" data-del-mob="${idx}">Remove</button>
+        </div>
       </div>
     `;
     me.appendChild(div);
