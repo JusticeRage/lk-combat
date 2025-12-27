@@ -1,46 +1,59 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-bs-theme="auto">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Legendary Kingdoms — Combat Tracker</title>
+
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
+
 <body>
-  <div class="container">
-    <div class="page-header text-center">
-      <h1>Legendary Kingdoms — Combat Tracker</h1>
-      <p class="lead">Party attacks first. Each hero may act once per round. Spells are once per battle.</p>
-    </div>
+  <div class="container-lg py-4">
+
+    <!-- Header -->
+    <header class="lk-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+      <div class="text-center text-md-start">
+        <h1 class="h3 mb-1">Legendary Kingdoms — Combat Tracker</h1>
+        <p class="text-body-secondary mb-0">Party attacks first. Each hero may act once per round. Spells are once per battle.</p>
+      </div>
+
+      <div class="d-flex justify-content-center justify-content-md-end gap-2">
+        <button class="btn btn-outline-secondary btn-sm" id="themeToggle" type="button" aria-label="Toggle theme">
+          <span class="lk-theme-icon" aria-hidden="true"></span>
+          <span class="lk-theme-text">Theme</span>
+        </button>
+      </div>
+    </header>
 
     <!-- Hero picker -->
     <dialog id="heroDialog" class="lk-dialog">
-      <div class="dialog-content">
-        <div class="dialog-header">
+      <form method="dialog" class="lk-dialog__card">
+        <div class="lk-dialog__header">
           <h2 class="h5 mb-0">Choose hero</h2>
         </div>
-        <div class="dialog-body">
-          <div class="mb-3">
-            <label class="form-label">Hero</label>
-            <select id="heroNameSelect" class="form-select"></select>
-          </div>
+        <div class="lk-dialog__body">
+          <label class="form-label">Hero</label>
+          <select id="heroNameSelect" class="form-select"></select>
         </div>
-        <div class="dialog-footer">
-          <button class="btn btn-outline-secondary" id="heroCancel">Cancel</button>
-          <button class="btn btn-primary" id="heroOk">Add</button>
+        <div class="lk-dialog__footer">
+          <button class="btn btn-outline-secondary" id="heroCancel" value="cancel">Cancel</button>
+          <button class="btn btn-primary" id="heroOk" value="ok">Add</button>
         </div>
-      </div>
+      </form>
     </dialog>
 
     <!-- Stats editor -->
     <dialog id="statsDialog" class="lk-dialog">
-      <div class="dialog-content">
-        <div class="dialog-header">
-          <h2 class="h5 mb-0">Edit hero stats</h2>
-          <div id="statsDialogHero" class="muted small"></div>
+      <form method="dialog" class="lk-dialog__card">
+        <div class="lk-dialog__header">
+          <div class="d-flex align-items-center justify-content-between gap-2">
+            <h2 class="h5 mb-0">Edit hero stats</h2>
+            <div id="statsDialogHero" class="text-body-secondary small text-truncate"></div>
+          </div>
         </div>
-        <div class="dialog-body">
+        <div class="lk-dialog__body">
           <div class="row g-3">
             <div class="col-md-4">
               <label class="form-label">Fighting</label>
@@ -76,45 +89,45 @@
             </div>
           </div>
         </div>
-        <div class="dialog-footer">
-          <button class="btn btn-outline-secondary" id="statsCancel">Cancel</button>
-          <button class="btn btn-primary" id="statsSave">Save</button>
+        <div class="lk-dialog__footer">
+          <button class="btn btn-outline-secondary" id="statsCancel" value="cancel">Cancel</button>
+          <button class="btn btn-primary" id="statsSave" value="ok">Save</button>
         </div>
-      </div>
+      </form>
     </dialog>
 
     <!-- Encounter import -->
     <dialog id="importDialog" class="lk-dialog">
-      <div class="dialog-content">
-        <div class="dialog-header">
-          <h2 class="h5 mb-1">Import encounter (opponents)</h2>
+      <form method="dialog" class="lk-dialog__card">
+        <div class="lk-dialog__header">
+          <h2 class="h5 mb-0">Import encounter (opponents)</h2>
         </div>
-        <div class="dialog-body">
-          <div class="muted small" style="margin-bottom:8px;">
+        <div class="lk-dialog__body">
+          <div class="text-body-secondary small mb-2">
             Blocks like:<br />
-            <span class="pill">1st Storm Priest</span><br />
-            <span class="pill">3 (4+)</span><br />
-            <span class="pill">4+</span><br />
-            <span class="pill">13</span><br />
-            Optional: <span class="pill">+2 Auto</span> on the attack line (e.g. <span class="pill">7 (3+) +2 Auto</span>)
+            <span class="lk-pill">1st Storm Priest</span><br />
+            <span class="lk-pill">3 (4+)</span><br />
+            <span class="lk-pill">4+</span><br />
+            <span class="lk-pill">13</span><br />
+            Optional: <span class="lk-pill">+2 Auto</span> on the attack line (e.g. <span class="lk-pill">7 (3+) +2 Auto</span>)
           </div>
-          <textarea id="importText" spellcheck="false" class="form-control"></textarea>
-          <div id="importError" class="error" style="margin-top:8px; display:none;"></div>
+          <textarea id="importText" spellcheck="false" class="form-control lk-textarea" rows="10"></textarea>
+          <div id="importError" class="invalid-feedback d-block" style="display:none;"></div>
         </div>
-        <div class="dialog-footer">
-          <button class="btn btn-outline-secondary" id="importCancel">Cancel</button>
-          <button class="btn btn-primary" id="importOk">Import (replace opponents)</button>
+        <div class="lk-dialog__footer">
+          <button class="btn btn-outline-secondary" id="importCancel" value="cancel">Cancel</button>
+          <button class="btn btn-primary" id="importOk" value="ok">Import (replace opponents)</button>
         </div>
-      </div>
+      </form>
     </dialog>
 
     <!-- Spell cast dialog -->
     <dialog id="spellDialog" class="lk-dialog">
-      <div class="dialog-content">
-        <div class="dialog-header">
+      <form method="dialog" class="lk-dialog__card">
+        <div class="lk-dialog__header">
           <h2 class="h5 mb-0">Cast spell</h2>
         </div>
-        <div class="dialog-body">
+        <div class="lk-dialog__body">
           <div class="row g-3">
             <div class="col-sm-6">
               <label class="form-label">Caster</label>
@@ -126,164 +139,197 @@
             </div>
           </div>
 
-          <div id="spellTargetArea" class="card" style="margin-top:10px;"></div>
-
-          <div id="spellError" class="error" style="margin-top:8px; display:none;"></div>
+          <div id="spellTargetArea" class="card mt-3"></div>
+          <div id="spellError" class="invalid-feedback d-block" style="display:none; margin-top:.5rem;"></div>
         </div>
-        <div class="dialog-footer">
-          <button class="btn btn-outline-secondary" id="spellCancel">Cancel</button>
-          <button class="btn btn-primary" id="spellOk">Cast</button>
+        <div class="lk-dialog__footer">
+          <button class="btn btn-outline-secondary" id="spellCancel" value="cancel">Cancel</button>
+          <button class="btn btn-primary" id="spellOk" value="ok">Cast</button>
         </div>
-      </div>
+      </form>
     </dialog>
 
-    <div class="tabs" role="tablist">
-      <button class="tab-button active" data-tab="partyTab">Party</button>
-      <button class="tab-button" data-tab="battleTab">Opponents &amp; Combat</button>
-    </div>
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-3" id="lkTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="partyTabBtn" data-bs-toggle="tab" data-bs-target="#partyTab"
+                type="button" role="tab" aria-controls="partyTab" aria-selected="true">
+          Party management
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="battleTabBtn" data-bs-toggle="tab" data-bs-target="#battleTab"
+                type="button" role="tab" aria-controls="battleTab" aria-selected="false">
+          Combat
+        </button>
+      </li>
+    </ul>
 
-    <div id="partyTab" class="tab-panel active">
-      <div class="panel panel-default">
-        <div class="panel-heading">
-          <h2 class="panel-title">Party (up to 4)</h2>
-        </div>
-        <div class="panel-body">
-          <div id="partyEditor"></div>
-          <div class="row" style="margin-top:10px;">
-            <div class="col-sm-12 text-right">
-              <button class="btn btn-primary" id="addMember">Add member</button>
-              <button class="btn btn-link" id="clearParty">Clear</button>
+    <div class="tab-content">
+      <!-- Party -->
+      <section id="partyTab" class="tab-pane fade show active" role="tabpanel" aria-labelledby="partyTabBtn" tabindex="0">
+        <div class="card shadow-sm">
+          <div class="card-header d-flex align-items-center justify-content-between gap-2">
+            <h2 class="h5 mb-0">Party (up to 4)</h2>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary btn-sm" id="addMember">Add member</button>
+              <button class="btn btn-link btn-sm" id="clearParty">Clear</button>
             </div>
           </div>
+          <div class="card-body">
+            <div id="partyEditor"></div>
+          </div>
         </div>
-      </div>
-    </div>
+      </section>
 
-    <div id="battleTab" class="tab-panel">
-      <div class="panel panel-default">
-        <div class="panel-heading">
-          <h2 class="panel-title">Opponents</h2>
-        </div>
-        <div class="panel-body">
-          <div class="row" style="margin-bottom:10px;">
-            <div class="col-sm-12 text-right">
-              <button class="btn btn-info" id="importEncounter">Import encounter</button>
-            </div>
-          </div>
-          <div id="mobEditor"></div>
-          <div class="row" style="margin-top:10px;">
-            <div class="col-sm-12 text-right">
-              <button class="btn btn-primary" id="addMob">Add opponent</button>
-              <button class="btn btn-link" id="clearMobs">Clear</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="grid two" style="margin-top:12px;">
-        <div class="panel panel-default">
-          <div class="panel-heading">
-            <h2 class="panel-title">Combat</h2>
-          </div>
-          <div class="panel-body">
-            <div class="row pill-row">
-              <div class="col-sm-8">
-                <span class="pill" id="phasePill">Phase: —</span>
-                <span class="pill" id="roundPill">Round: 1</span>
+      <!-- Combat -->
+      <section id="battleTab" class="tab-pane fade" role="tabpanel" aria-labelledby="battleTabBtn" tabindex="0">
+        <div class="row g-3">
+          <div class="col-12">
+            <div class="card shadow-sm">
+              <div class="card-header d-flex align-items-center justify-content-between gap-2">
+                <h2 class="h5 mb-0">Opponents</h2>
+                <div class="d-flex flex-wrap gap-2 justify-content-end">
+                  <button class="btn btn-outline-primary btn-sm" id="importEncounter">Import encounter</button>
+                  <button class="btn btn-primary btn-sm" id="addMob">Add opponent</button>
+                  <button class="btn btn-link btn-sm" id="clearMobs">Clear</button>
+                </div>
               </div>
-              <div class="col-sm-4 text-right">
-                <button class="btn btn-success" id="startCombat">Start / Restart combat</button>
+              <div class="card-body">
+                <div id="mobEditor"></div>
               </div>
             </div>
+          </div>
 
-            <div style="margin-top:12px;" class="panel panel-default inner-card">
-              <div class="panel-body">
-                <div class="row">
-                  <div class="col-sm-4">
-                    <div class="pill" id="turnPill">Turn: —</div>
+          <div class="col-12 col-xl-8">
+            <div class="card shadow-sm">
+              <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <h2 class="h5 mb-0">Combat</h2>
+                <button class="btn btn-success btn-sm" id="startCombat">Start / Restart combat</button>
+              </div>
+              <div class="card-body">
+                <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                  <div class="d-flex flex-wrap gap-2">
+                    <span class="lk-pill" id="phasePill">Phase: —</span>
+                    <span class="lk-pill" id="roundPill">Round: 1</span>
+                    <span class="lk-pill" id="turnPill">Turn: —</span>
                   </div>
-                  <div class="col-sm-8">
-                    <div class="muted" id="turnHelp"></div>
+                  <div id="turnHelp" class="text-body-secondary small text-end"></div>
+                </div>
+
+                <div class="card mt-3 lk-inner-card">
+                  <div class="card-body">
+                    <div id="playerControls">
+                      <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                          <label class="form-label mb-1">Attacker (party)</label>
+                          <select id="playerAttacker" class="form-select form-select-sm"></select>
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label mb-1">Target (opponent)</label>
+                          <select id="playerTarget" class="form-select form-select-sm"></select>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+                            <button class="btn btn-primary btn-sm" id="playerAttack">Attack</button>
+                            <button class="btn btn-outline-primary btn-sm" id="playerSpell">Cast spell</button>
+                            <button class="btn btn-outline-secondary btn-sm" id="playerSkip">Skip</button>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="text-body-secondary small mt-2">
+                        Heroes who already acted this round are disabled.
+                      </div>
+                    </div>
+
+                    <div id="enemyControls" class="mt-3" style="display:none;">
+                      <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                          <label class="form-label mb-1">Current enemy</label>
+                          <select id="enemyCurrent" disabled class="form-select form-select-sm"></select>
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label mb-1">Assign hits to party member</label>
+                          <select id="enemyVictim" class="form-select form-select-sm"></select>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+                            <button class="btn btn-primary btn-sm" id="enemyResolveOne">Resolve attack</button>
+                            <button class="btn btn-outline-secondary btn-sm" id="enemyResolveAll">Resolve all</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 justify-content-end mt-3">
+                      <button class="btn btn-outline-secondary btn-sm" id="undo">Undo</button>
+                      <button class="btn btn-outline-danger btn-sm" id="endCombat">End combat (manual)</button>
+                    </div>
                   </div>
                 </div>
 
-                <div id="playerControls" style="margin-top:10px;">
-                  <div class="row form-row">
-                    <div class="col-sm-4">
-                      <label>Attacker (party)
-                        <select id="playerAttacker" class="form-control input-sm"></select>
-                      </label>
-                    </div>
-                    <div class="col-sm-4">
-                      <label>Target (opponent)
-                        <select id="playerTarget" class="form-control input-sm"></select>
-                      </label>
-                    </div>
-                    <div class="col-sm-4 btn-group-row">
-                      <button class="btn btn-primary btn-sm" id="playerAttack">Attack</button>
-                      <button class="btn btn-info btn-sm" id="playerSpell">Cast spell</button>
-                      <button class="btn btn-default btn-sm" id="playerSkip">Skip</button>
-                    </div>
+                <div class="row g-3 mt-1">
+                  <div class="col-12">
+                    <h3 class="h6 mt-2 mb-2">Party status</h3>
+                    <div id="partyTable" class="lk-table"></div>
                   </div>
-                  <div class="muted" style="margin-top:6px;">
-                    Heroes who already acted this round are disabled.
-                  </div>
-                </div>
-
-                <div id="enemyControls" style="margin-top:10px; display:none;">
-                  <div class="row form-row">
-                    <div class="col-sm-4">
-                      <label>Current enemy
-                        <select id="enemyCurrent" disabled class="form-control input-sm"></select>
-                      </label>
-                    </div>
-                    <div class="col-sm-4">
-                      <label>Assign hits to party member
-                        <select id="enemyVictim" class="form-control input-sm"></select>
-                      </label>
-                    </div>
-                    <div class="col-sm-4 btn-group-row">
-                      <button class="btn btn-primary btn-sm" id="enemyResolveOne">Resolve attack</button>
-                      <button class="btn btn-default btn-sm" id="enemyResolveAll">Resolve all</button>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="row" style="margin-top:12px;">
-                  <div class="col-sm-12 text-right">
-                    <button class="btn btn-default" id="undo">Undo</button>
-                    <button class="btn btn-danger" id="endCombat">End combat (manual)</button>
+                  <div class="col-12">
+                    <h3 class="h6 mt-2 mb-2">Opponent status</h3>
+                    <div id="mobTable" class="lk-table"></div>
                   </div>
                 </div>
               </div>
             </div>
-
-            <h2>Party status</h2>
-            <div id="partyTable"></div>
-
-            <h2>Opponent status</h2>
-            <div id="mobTable"></div>
           </div>
-        </div>
 
-        <div class="panel panel-default">
-          <div class="panel-heading">
-            <h2 class="panel-title">Log</h2>
-          </div>
-          <div class="panel-body">
-            <div class="row" style="margin-bottom:8px;">
-              <div class="col-sm-12 text-right">
-                <button class="btn btn-default" id="copyLog">Copy log</button>
-                <button class="btn btn-link" id="clearLog">Clear log</button>
+          <div class="col-12 col-xl-4">
+            <div class="card shadow-sm h-100">
+              <div class="card-header d-flex align-items-center justify-content-between gap-2">
+                <h2 class="h5 mb-0">Log</h2>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-outline-secondary btn-sm" id="copyLog">Copy</button>
+                  <button class="btn btn-link btn-sm" id="clearLog">Clear</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <div id="log" class="lk-log"></div>
               </div>
             </div>
-            <div id="log" class="log"></div>
           </div>
+
         </div>
-      </div>
+      </section>
     </div>
   </div>
 
   <script type="module" src="./app.js"></script>
+
+  <!-- Theme toggle (does not touch app.js) -->
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const btn = document.getElementById('themeToggle');
+
+      function apply(theme) {
+        root.setAttribute('data-bs-theme', theme);
+        try { localStorage.setItem('lk-theme', theme); } catch(e) {}
+        btn?.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+      }
+
+      function init() {
+        let theme = 'auto';
+        try { theme = localStorage.getItem('lk-theme') || 'auto'; } catch(e) {}
+        apply(theme);
+      }
+
+      btn?.addEventListener('click', () => {
+        const current = root.getAttribute('data-bs-theme') || 'auto';
+        const next = current === 'light' ? 'dark' : current === 'dark' ? 'auto' : 'light';
+        apply(next);
+      });
+
+      init();
+    })();
+  </script>
 </body>
 </html>

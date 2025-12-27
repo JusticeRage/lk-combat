@@ -55,6 +55,79 @@ const STAT_ICONS = {
 
 const $ = (id) => document.getElementById(id);
 
+function bsModalShow(id) {
+  const el = $(id);
+  if (!el || typeof bootstrap === "undefined" || !bootstrap.Modal) return;
+  bootstrap.Modal.getOrCreateInstance(el).show();
+}
+
+function bsModalHide(id) {
+  const el = $(id);
+  if (!el || typeof bootstrap === "undefined" || !bootstrap.Modal) return;
+  (bootstrap.Modal.getInstance(el) || bootstrap.Modal.getOrCreateInstance(el)).hide();
+}
+
+// Ensure stats modal exists even if HTML doesn't include it (for Bootstrap-only UI)
+function ensureStatsModalExists() {
+  if ($("statsDialog")) return;
+  const wrap = document.createElement("div");
+  wrap.innerHTML = `
+  <div class="modal fade" id="statsDialog" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title">Edit hero stats</h5>
+            <div id="statsDialogHero" class="text-secondary small"></div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              <label class="form-label small text-secondary mb-1" for="statFighting">Fighting</label>
+              <input type="number" min="0" max="50" id="statFighting" class="form-control">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small text-secondary mb-1" for="statStealth">Stealth</label>
+              <input type="number" min="0" max="50" id="statStealth" class="form-control">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small text-secondary mb-1" for="statLore">Lore</label>
+              <input type="number" min="0" max="50" id="statLore" class="form-control">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small text-secondary mb-1" for="statSurvival">Survival</label>
+              <input type="number" min="0" max="50" id="statSurvival" class="form-control">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small text-secondary mb-1" for="statCharisma">Charisma</label>
+              <input type="number" min="0" max="50" id="statCharisma" class="form-control">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small text-secondary mb-1" for="statArmour">Armour</label>
+              <input type="number" min="0" max="50" id="statArmour" class="form-control">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label small text-secondary mb-1" for="statMaxHp">Max HP</label>
+              <input type="number" min="1" max="999" id="statMaxHp" class="form-control">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label small text-secondary mb-1" for="statHp">HP</label>
+              <input type="number" min="0" max="999" id="statHp" class="form-control">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" id="statsCancel" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="statsSave">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(wrap.firstElementChild);
+}
+
 function syncPreferredTheme() {
   const media = window.matchMedia("(prefers-color-scheme: dark)");
   const apply = () => document.documentElement.setAttribute("data-bs-theme", media.matches ? "dark" : "light");
@@ -1223,11 +1296,12 @@ function openHeroDialog() {
   }
 
   $("heroOk").disabled = available.length === 0;
-  $("heroDialog").showModal();
+  bsModalShow("heroDialog");
 }
 
 // --- Dialog: stat editor ---
 function openStatsDialog(memberIdx) {
+  ensureStatsModalExists();
   const member = state.party[memberIdx];
   if (!member) return;
   const dlg = $("statsDialog");
@@ -1241,7 +1315,7 @@ function openStatsDialog(memberIdx) {
   $("statArmour").value = member.armour ?? 0;
   $("statMaxHp").value = member.maxHealth ?? 1;
   $("statHp").value = member.health ?? 0;
-  dlg.showModal();
+  bsModalShow("statsDialog");
 }
 
 function saveStatsFromDialog() {
@@ -1263,7 +1337,7 @@ function saveStatsFromDialog() {
   state.battleSeed = null;
   saveSetupToStorage(state);
   renderAll();
-  dlg.close();
+  bsModalHide("statsDialog");
 }
 
 // --- Dialog: spell casting UI ---
@@ -1432,7 +1506,7 @@ function openSpellDialog() {
 
   renderSpellOptions();
   refreshSpellDisabled();
-  $("spellDialog").showModal();
+  bsModalShow("spellDialog");
 }
 
 function readSpellTargets(spell) {
@@ -1500,6 +1574,7 @@ function endCombatManual() {
 
 // --- Wire UI ---
 function initUI() {
+  ensureStatsModalExists();
   // Buttons
   $("startCombat").addEventListener("click", startOrRestartCombat);
   document.querySelectorAll(".tab-button").forEach(btn => {
@@ -1568,15 +1643,15 @@ function initUI() {
     $("importError").style.display = "none";
     $("importError").textContent = "";
     $("importText").value = "";
-    $("importDialog").showModal();
+    bsModalShow("importDialog");
   });
-  $("importCancel").addEventListener("click", () => $("importDialog").close());
+  $("importCancel").addEventListener("click", () => bsModalHide("importDialog"));
   $("importOk").addEventListener("click", () => {
     try {
       state.mobs = parseEncounterText($("importText").value || "");
       state.battleSeed = null;
       saveSetupToStorage(state);
-      $("importDialog").close();
+      bsModalHide("importDialog");
       renderAll();
     } catch (e) {
       $("importError").textContent = String(e?.message || e);
@@ -1585,7 +1660,7 @@ function initUI() {
   });
 
   // Hero dialog
-  $("heroCancel").addEventListener("click", () => $("heroDialog").close());
+  $("heroCancel").addEventListener("click", () => bsModalHide("heroDialog"));
   $("heroOk").addEventListener("click", () => {
     const name = $("heroNameSelect").value;
     if (!name) return;
@@ -1594,16 +1669,16 @@ function initUI() {
     state.party.push(newMember(name));
     state.battleSeed = null;
     saveSetupToStorage(state);
-    $("heroDialog").close();
+    bsModalHide("heroDialog");
     renderAll();
   });
 
   // Stat dialog
-  $("statsCancel").addEventListener("click", () => $("statsDialog").close());
+  $("statsCancel").addEventListener("click", () => bsModalHide("statsDialog"));
   $("statsSave").addEventListener("click", saveStatsFromDialog);
 
   // Spell dialog
-  $("spellCancel").addEventListener("click", () => $("spellDialog").close());
+  $("spellCancel").addEventListener("click", () => bsModalHide("spellDialog"));
   $("spellOk").addEventListener("click", () => {
     $("spellError").style.display = "none";
     $("spellError").textContent = "";
@@ -1620,17 +1695,12 @@ function initUI() {
       const chk = canCastSpell(caster, spell);
       if (!chk.ok) throw new Error(chk.reason);
 
-      $("spellDialog").close();
+      bsModalHide("spellDialog");
       castSpell({ casterIdx, spellId, targets });
     } catch (e) {
       $("spellError").textContent = String(e?.message || e);
       $("spellError").style.display = "";
     }
-  });
-
-  // backdrop close
-  ["heroDialog","importDialog","spellDialog","statsDialog"].forEach(id => {
-    $(id).addEventListener("click", (e) => { if (e.target === $(id)) $(id).close(); });
   });
 }
 
@@ -1662,17 +1732,6 @@ function openHeroDialogPopulate() {
   syncPreferredTheme();
   initState();
   initUI();
-
-  // override openHeroDialog to repopulate each time
-  const oldOpen = openHeroDialog;
-  // eslint-disable-next-line no-unused-vars
-  function openHeroDialogWrapped() {
-    if (state.party.length >= 4) return;
-    openHeroDialogPopulate();
-    $("heroDialog").showModal();
-  }
-  // patch button handler (simpler than rewriting above)
-  $("addMember").onclick = openHeroDialogWrapped;
 
   renderAll();
 })();
