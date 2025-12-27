@@ -36,8 +36,9 @@ th { font-size: 12px; opacity: .9; }
 .equip-equipped { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .notes { flex: 1 1 100%; }
 .notes textarea { width: 100%; min-height: 80px; }
-.stat-summary { align-items: center; }
-.stat-pill { margin-right: 6px; white-space: nowrap; }
+.hero-header { align-items: center; }
+.stat-summary { flex: 1 1 200px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.stat-pill { margin-right: 0; white-space: nowrap; }
 .spell-card { background: rgba(127,127,127,.05); }
 .spell-row label { flex: 1 1 200px; min-width: 200px; }
 dialog { border: 1px solid rgba(127,127,127,.35); border-radius: 12px; padding: 12px; max-width: 720px; width: calc(100vw - 32px); }

@@ -41,9 +41,21 @@ const STAT_ICONS = {
   lore: "📚",
   survival: "🏕️",
   charisma: "💬",
+  armour: "🛡️",
 };
 
 const $ = (id) => document.getElementById(id);
+
+const formatSpellType = (spell) => {
+  const raw = spell?.type || "combat";
+  const label = String(raw).replace(/_/g, " ");
+  return label.charAt(0).toUpperCase() + label.slice(1);
+};
+
+const formatSpellOptionLabel = (spell) => {
+  const typeLabel = formatSpellType(spell);
+  return `${spell.name} (${typeLabel} • Recharge ${spell.recharge})`;
+};
 
 const isSpellcaster = (name) => SPELLCASTER_NAMES.has(name);
 
@@ -612,6 +624,7 @@ function canCastSpell(caster, spell) {
   const known = findKnownSpell(caster, spell.id);
   if (!known) return { ok: false, reason: "Spell is not prepared." };
   if (known.status === "exhausted") return { ok: false, reason: "Spell is exhausted." };
+  if (spell.type !== "combat") return { ok: false, reason: "This spell cannot be cast in combat." };
   if (spell.oncePerBattle && caster.spellsUsed?.[spell.id]) return { ok: false, reason: "Spell already used this battle." };
   return { ok: true, reason: "" };
 }
@@ -734,9 +747,11 @@ function renderEditors() {
       : Array.from({ length: EQUIPMENT_SLOTS }, () => ({ ...EMPTY_EQUIPMENT_ENTRY }));
     const statBadges = (() => {
       const stats = computeDisplayedStats(p);
-      return ["fighting", "stealth", "lore", "survival", "charisma", "armour"]
+      const statKeys = ["fighting", "stealth", "lore", "survival", "charisma", "armour"];
+      const hpBadge = `<span class="pill stat-pill">HP: ${Math.max(0, p.health)}/${p.maxHealth}</span>`;
+      return statKeys
         .map(k => `<span class="pill stat-pill">${escapeHtml(formatStatBadge(k, stats[k]))}</span>`)
-        .join("");
+        .join("") + hpBadge;
     })();
 
     const equipmentRows = equipment.map((eqRaw, slot) => {
@@ -776,7 +791,7 @@ function renderEditors() {
             <label>Spell ${i + 1}
               <select data-k="spellId" data-si="${i}" data-i="${idx}">
                 <option value="">— None —</option>
-                ${SPELLS.map(sp => `<option value="${sp.id}" ${entry.id === sp.id ? "selected" : ""}>${escapeHtml(sp.name)} (Recharge ${sp.recharge})</option>`).join("")}
+                ${SPELLS.map(sp => `<option value="${sp.id}" ${entry.id === sp.id ? "selected" : ""}>${escapeHtml(formatSpellOptionLabel(sp))}</option>`).join("")}
               </select>
             </label>
             <label>Status
@@ -791,25 +806,16 @@ function renderEditors() {
     }
 
     div.innerHTML = `
-      <div class="row">
+      <div class="row hero-header">
         <label>Name
           <select data-k="name" data-i="${idx}">
             ${HERO_NAMES.map(n => `<option value="${escapeHtml(n)}" ${p.name===n ? "selected":""}>${escapeHtml(n)}</option>`).join("")}
           </select>
         </label>
-        <label>Fighting <input type="number" min="0" max="50" data-k="fighting" data-i="${idx}" value="${p.fighting}"></label>
-        <label>Stealth <input type="number" min="0" max="50" data-k="stealth" data-i="${idx}" value="${p.stealth ?? 0}"></label>
-        <label>Lore <input type="number" min="0" max="50" data-k="lore" data-i="${idx}" value="${p.lore ?? 0}"></label>
-        <label>Survival <input type="number" min="0" max="50" data-k="survival" data-i="${idx}" value="${p.survival ?? 0}"></label>
-        <label>Charisma <input type="number" min="0" max="50" data-k="charisma" data-i="${idx}" value="${p.charisma ?? 0}"></label>
-      </div>
-      <div class="row">
-        <label>Armour <input type="number" min="0" max="50" data-k="armour" data-i="${idx}" value="${p.armour}"></label>
-        <label>Max HP <input type="number" min="1" max="999" data-k="maxHealth" data-i="${idx}" value="${p.maxHealth}"></label>
-        <label>HP <input type="number" min="0" max="999" data-k="health" data-i="${idx}" value="${p.health}"></label>
+        <div class="stat-summary">${statBadges}</div>
+        <button data-edit-stats="${idx}">Edit stats</button>
         <button data-del-party="${idx}">Remove</button>
       </div>
-      <div class="row stat-summary">${statBadges}</div>
       <div class="row equipment-grid">${equipmentRows}</div>
       <div class="row">
         <label class="notes">Notes
@@ -843,6 +849,10 @@ function renderEditors() {
   });
 
   pe.querySelectorAll("[data-k]").forEach(el => el.addEventListener("change", onPartyEdit));
+  pe.querySelectorAll("button[data-edit-stats]").forEach(el => el.addEventListener("click", (e) => {
+    const i = Number(e.target.getAttribute("data-edit-stats"));
+    openStatsDialog(i);
+  }));
   pe.querySelectorAll("button[data-del-party]").forEach(el => el.addEventListener("click", (e) => {
     const i = Number(e.target.getAttribute("data-del-party"));
     state.party.splice(i, 1);
@@ -978,7 +988,7 @@ function renderTables() {
         ? (p.actedThisRound ? `<span class="pill">Acted</span>` : `<span class="pill">Ready</span>`)
         : "";
       const stats = computeDisplayedStats(p);
-      const statLine = ["fighting", "stealth", "lore", "survival", "charisma", "armour"]
+      const statLine = ["fighting", "armour"]
         .map(k => `<span class="pill stat-pill">${escapeHtml(formatStatBadge(k, stats[k]))}</span>`)
         .join(" ");
       return `
@@ -1130,6 +1140,46 @@ function openHeroDialog() {
   $("heroDialog").showModal();
 }
 
+// --- Dialog: stat editor ---
+function openStatsDialog(memberIdx) {
+  const member = state.party[memberIdx];
+  if (!member) return;
+  const dlg = $("statsDialog");
+  dlg.dataset.index = String(memberIdx);
+  $("statsDialogHero").textContent = member.name;
+  $("statFighting").value = member.fighting ?? 0;
+  $("statStealth").value = member.stealth ?? 0;
+  $("statLore").value = member.lore ?? 0;
+  $("statSurvival").value = member.survival ?? 0;
+  $("statCharisma").value = member.charisma ?? 0;
+  $("statArmour").value = member.armour ?? 0;
+  $("statMaxHp").value = member.maxHealth ?? 1;
+  $("statHp").value = member.health ?? 0;
+  dlg.showModal();
+}
+
+function saveStatsFromDialog() {
+  const dlg = $("statsDialog");
+  const idx = Number(dlg.dataset.index || -1);
+  const member = state.party[idx];
+  if (!member) return;
+
+  member.fighting = clampInt($("statFighting").value, 0, 50, member.fighting);
+  member.stealth = clampInt($("statStealth").value, 0, 50, member.stealth);
+  member.lore = clampInt($("statLore").value, 0, 50, member.lore);
+  member.survival = clampInt($("statSurvival").value, 0, 50, member.survival);
+  member.charisma = clampInt($("statCharisma").value, 0, 50, member.charisma);
+  member.armour = clampInt($("statArmour").value, 0, 50, member.armour);
+  member.maxHealth = clampInt($("statMaxHp").value, 1, 999, member.maxHealth);
+  member.health = clampInt($("statHp").value, 0, member.maxHealth, member.health);
+
+  enforceWeaponHandLimit(member);
+  state.battleSeed = null;
+  saveSetupToStorage(state);
+  renderAll();
+  dlg.close();
+}
+
 // --- Dialog: spell casting UI ---
 function openSpellDialog() {
   if (!(state.phase === "combat" && state.turn === "party")) return;
@@ -1151,19 +1201,23 @@ function openSpellDialog() {
 
   // spells list: disable if used by selected caster (updated on change)
   const spellSel = $("spellSelect");
-  const renderSpellOptions = () => {
-    spellSel.innerHTML = "";
-    const cidx = Number(casterSel.value);
-    const caster = state.party[cidx];
-    const known = caster?.spells?.filter(s => s.id) || [];
+    const renderSpellOptions = () => {
+      spellSel.innerHTML = "";
+      const cidx = Number(casterSel.value);
+      const caster = state.party[cidx];
+      const known = caster?.spells?.filter(s => {
+        if (!s.id) return false;
+        const sp = getSpellById(s.id);
+        return sp?.type === "combat";
+      }) || [];
 
-    if (!known.length) {
-      const opt = document.createElement("option");
-      opt.value = "";
-      opt.textContent = "No spells prepared";
-      opt.disabled = true;
-      spellSel.appendChild(opt);
-      spellSel.disabled = true;
+      if (!known.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "No combat spells prepared";
+        opt.disabled = true;
+        spellSel.appendChild(opt);
+        spellSel.disabled = true;
       const area = $("spellTargetArea");
       area.innerHTML = `<div class="muted">${caster ? "No prepared spells for this caster." : "Select a caster."}</div>`;
       return;
@@ -1176,7 +1230,7 @@ function openSpellDialog() {
       const opt = document.createElement("option");
       const statusSuffix = entry.status === "exhausted" ? " (exhausted)" : "";
       opt.value = sp.id;
-      opt.textContent = `${sp.name}${statusSuffix}`;
+      opt.textContent = `${formatSpellOptionLabel(sp)}${statusSuffix}`;
       spellSel.appendChild(opt);
     }
   };
@@ -1391,8 +1445,15 @@ function initUI() {
 
   $("addMember").addEventListener("click", openHeroDialog);
   $("clearParty").addEventListener("click", () => {
+    if (!confirm("Clear party setup and saved data?")) return;
     state.party = [];
     state.battleSeed = null;
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      const obj = raw ? JSON.parse(raw) : {};
+      obj.party = [];
+      localStorage.setItem(LS_KEY, JSON.stringify(obj));
+    } catch {}
     saveSetupToStorage(state);
     renderAll();
   });
@@ -1403,33 +1464,16 @@ function initUI() {
     renderAll();
   });
   $("clearMobs").addEventListener("click", () => {
+    if (!confirm("Clear opponents and saved data?")) return;
     state.mobs = [];
     state.battleSeed = null;
-    saveSetupToStorage(state);
-    renderAll();
-  });
-
-  $("resetSavedParty").addEventListener("click", () => {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      const obj = raw ? JSON.parse(raw) : {};
-      obj.party = [];
-      localStorage.setItem(LS_KEY, JSON.stringify(obj));
-    } catch {}
-    state.party = [];
-    state.battleSeed = null;
-    renderAll();
-  });
-
-  $("resetSavedMobs").addEventListener("click", () => {
     try {
       const raw = localStorage.getItem(LS_KEY);
       const obj = raw ? JSON.parse(raw) : {};
       obj.mobs = [];
       localStorage.setItem(LS_KEY, JSON.stringify(obj));
     } catch {}
-    state.mobs = [];
-    state.battleSeed = null;
+    saveSetupToStorage(state);
     renderAll();
   });
 
@@ -1468,6 +1512,10 @@ function initUI() {
     renderAll();
   });
 
+  // Stat dialog
+  $("statsCancel").addEventListener("click", () => $("statsDialog").close());
+  $("statsSave").addEventListener("click", saveStatsFromDialog);
+
   // Spell dialog
   $("spellCancel").addEventListener("click", () => $("spellDialog").close());
   $("spellOk").addEventListener("click", () => {
@@ -1495,7 +1543,7 @@ function initUI() {
   });
 
   // backdrop close
-  ["heroDialog","importDialog","spellDialog"].forEach(id => {
+  ["heroDialog","importDialog","spellDialog","statsDialog"].forEach(id => {
     $(id).addEventListener("click", (e) => { if (e.target === $(id)) $(id).close(); });
   });
 }

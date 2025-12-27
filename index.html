@@ -26,6 +26,44 @@
     </div>
   </dialog>
 
+  <!-- Stats editor -->
+  <dialog id="statsDialog">
+    <h2 style="margin-top:0;">Edit hero stats</h2>
+    <div id="statsDialogHero" class="muted" style="margin-bottom:8px;"></div>
+    <div class="row">
+      <label>Fighting
+        <input type="number" min="0" max="50" id="statFighting">
+      </label>
+      <label>Stealth
+        <input type="number" min="0" max="50" id="statStealth">
+      </label>
+      <label>Lore
+        <input type="number" min="0" max="50" id="statLore">
+      </label>
+      <label>Survival
+        <input type="number" min="0" max="50" id="statSurvival">
+      </label>
+      <label>Charisma
+        <input type="number" min="0" max="50" id="statCharisma">
+      </label>
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <label>Armour
+        <input type="number" min="0" max="50" id="statArmour">
+      </label>
+      <label>Max HP
+        <input type="number" min="1" max="999" id="statMaxHp">
+      </label>
+      <label>HP
+        <input type="number" min="0" max="999" id="statHp">
+      </label>
+    </div>
+    <div class="dlg-actions">
+      <button id="statsCancel">Cancel</button>
+      <button class="primary" id="statsSave">Save</button>
+    </div>
+  </dialog>
+
   <!-- Encounter import -->
   <dialog id="importDialog">
     <h2 style="margin-top:0;">Import encounter (opponents)</h2>
@@ -79,7 +117,6 @@
       <div class="row" style="margin-top:10px;">
         <button id="addMember">Add member</button>
         <button id="clearParty">Clear</button>
-        <button id="resetSavedParty" class="right">Reset saved party</button>
       </div>
     </div>
   </div>
@@ -89,7 +126,6 @@
       <h2>Opponents</h2>
       <div class="row" style="margin-bottom:10px;">
         <button id="importEncounter">Import encounter</button>
-        <button id="resetSavedMobs" class="right">Reset saved opponents</button>
       </div>
       <div id="mobEditor"></div>
       <div class="row" style="margin-top:10px;">
