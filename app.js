@@ -16,13 +16,18 @@ const HERO_NAMES = [
 ];
 
 const SPELLCASTER_NAMES = new Set([
-  "Akihiro of Chalice",
+  "Amelia Pass-Dayne",
   "Lord Ti’quon",
 ]);
+
+const EQUIPMENT_SLOTS = 10;
+const SPELL_SLOTS = 6;
 
 const LS_KEY = "lk_combat_tracker_v3";
 
 const $ = (id) => document.getElementById(id);
+
+const isSpellcaster = (name) => SPELLCASTER_NAMES.has(name);
 
 function escapeHtml(s) {
   return String(s)
@@ -35,8 +40,19 @@ function escapeHtml(s) {
 function saveSetupToStorage(state) {
   const payload = {
     party: state.party.map(p => ({
-      name: p.name, fighting: p.fighting, armour: p.armour,
-      hasWeapon: !!p.hasWeapon, health: p.health, maxHealth: p.maxHealth
+      name: p.name,
+      fighting: p.fighting,
+      stealth: p.stealth,
+      lore: p.lore,
+      survival: p.survival,
+      charisma: p.charisma,
+      armour: p.armour,
+      hasWeapon: !!p.hasWeapon,
+      health: p.health,
+      maxHealth: p.maxHealth,
+      equipment: p.equipment,
+      notes: p.notes,
+      spells: p.spells,
     })),
     mobs: state.mobs.map(m => ({
       name: m.name, atkDice: m.atkDice, atkTarget: m.atkTarget, auto: m.auto,
@@ -84,6 +100,10 @@ function newMember(name, seed = null) {
   const base = {
     name,
     fighting: 3,
+    stealth: 0,
+    lore: 0,
+    survival: 0,
+    charisma: 0,
     armour: 0,
     hasWeapon: true,
     health: 8,
@@ -91,6 +111,9 @@ function newMember(name, seed = null) {
     dead: false,
     actedThisRound: false,
     buffs: [],
+    equipment: Array.from({ length: EQUIPMENT_SLOTS }, () => ""),
+    notes: "",
+    spells: Array.from({ length: SPELL_SLOTS }, () => ({ id: "", status: "ready" })),
     // spell usage tracked per hero
     spellsUsed: {} // { spellId: true }
   };
@@ -98,10 +121,24 @@ function newMember(name, seed = null) {
   return {
     ...base,
     fighting: clampInt(seed.fighting, 0, 99, 3),
+    stealth: clampInt(seed.stealth, 0, 99, 0),
+    lore: clampInt(seed.lore, 0, 99, 0),
+    survival: clampInt(seed.survival, 0, 99, 0),
+    charisma: clampInt(seed.charisma, 0, 99, 0),
     armour: clampInt(seed.armour, 0, 99, 0),
     hasWeapon: !!seed.hasWeapon,
     health: clampInt(seed.health, 0, 999, 8),
     maxHealth: clampInt(seed.maxHealth, 1, 999, 8),
+    equipment: Array.isArray(seed.equipment)
+      ? Array.from({ length: EQUIPMENT_SLOTS }, (_, i) => String(seed.equipment[i] || ""))
+      : base.equipment,
+    notes: typeof seed.notes === "string" ? seed.notes : "",
+    spells: Array.isArray(seed.spells)
+      ? Array.from({ length: SPELL_SLOTS }, (_, i) => ({
+        id: seed.spells[i]?.id || "",
+        status: seed.spells[i]?.status === "exhausted" ? "exhausted" : "ready",
+      }))
+      : base.spells,
   };
 }
 
@@ -209,6 +246,11 @@ function checkDeaths() {
   }
 }
 
+const findKnownSpell = (caster, spellId) => {
+  if (!caster?.spells) return null;
+  return caster.spells.find(s => s.id === spellId && s.id);
+};
+
 function checkEnd() {
   if (livingParty().length === 0) { state.phase = "ended"; pushLog("=== DEFEAT: entire party killed ==="); return true; }
   if (livingMobs().length === 0) { state.phase = "ended"; pushLog("=== VICTORY: all opponents defeated ==="); return true; }
@@ -225,11 +267,24 @@ function normalizeForCombat() {
     p.health = Math.min(clampInt(p.health, 0, 999, p.maxHealth), p.maxHealth);
     p.dead = (p.health <= 0);
     p.fighting = clampInt(p.fighting, 0, 99, p.fighting);
+    p.stealth = clampInt(p.stealth, 0, 99, p.stealth);
+    p.lore = clampInt(p.lore, 0, 99, p.lore);
+    p.survival = clampInt(p.survival, 0, 99, p.survival);
+    p.charisma = clampInt(p.charisma, 0, 99, p.charisma);
     p.armour = clampInt(p.armour, 0, 99, p.armour);
     p.hasWeapon = !!p.hasWeapon;
     p.actedThisRound = false;
     p.buffs = [];
     p.spellsUsed = {};
+    p.equipment = Array.isArray(p.equipment)
+      ? Array.from({ length: EQUIPMENT_SLOTS }, (_, i) => String(p.equipment[i] || ""))
+      : Array.from({ length: EQUIPMENT_SLOTS }, () => "");
+    p.spells = Array.isArray(p.spells)
+      ? Array.from({ length: SPELL_SLOTS }, (_, i) => ({
+        id: p.spells[i]?.id || "",
+        status: p.spells[i]?.status === "exhausted" ? "exhausted" : "ready",
+      }))
+      : Array.from({ length: SPELL_SLOTS }, () => ({ id: "", status: "ready" }));
   }
   for (const m of state.mobs) {
     m.maxHealth = Math.max(1, clampInt(m.maxHealth, 1, 999, 6));
@@ -403,9 +458,12 @@ function resolveAllEnemyAttacks(victimIdx) {
 // --- Spell casting engine (small) ---
 function canCastSpell(caster, spell) {
   if (state.phase !== "combat" || state.turn !== "party") return { ok: false, reason: "Not on party turn." };
-  if (!SPELLCASTER_NAMES.has(caster.name)) return { ok: false, reason: "This hero cannot cast spells." };
+  if (!isSpellcaster(caster.name)) return { ok: false, reason: "This hero cannot cast spells." };
   if (caster.dead || caster.health <= 0) return { ok: false, reason: "Caster is dead." };
   if (caster.actedThisRound) return { ok: false, reason: "Caster already acted this round." };
+  const known = findKnownSpell(caster, spell.id);
+  if (!known) return { ok: false, reason: "Spell is not prepared." };
+  if (known.status === "exhausted") return { ok: false, reason: "Spell is exhausted." };
   if (spell.oncePerBattle && caster.spellsUsed?.[spell.id]) return { ok: false, reason: "Spell already used this battle." };
   return { ok: true, reason: "" };
 }
@@ -484,6 +542,8 @@ function castSpell({ casterIdx, spellId, targets }) {
   caster.actedThisRound = true;
   if (!caster.spellsUsed) caster.spellsUsed = {};
   caster.spellsUsed[spell.id] = true;
+  const known = findKnownSpell(caster, spell.id);
+  if (known) known.status = "exhausted";
 
   checkDeaths();
   checkEnd();
@@ -499,6 +559,42 @@ function renderEditors() {
     const div = document.createElement("div");
     div.className = "card";
     div.style.marginBottom = "10px";
+    const equipment = Array.isArray(p.equipment)
+      ? Array.from({ length: EQUIPMENT_SLOTS }, (_, i) => p.equipment[i] || "")
+      : Array.from({ length: EQUIPMENT_SLOTS }, () => "");
+
+    const equipmentRows = equipment.map((eq, slot) => `
+      <label class="equip-label">Item ${slot + 1}
+        <input type="text" data-k="equipment" data-ei="${slot}" data-i="${idx}" value="${escapeHtml(eq)}" placeholder="Empty">
+      </label>
+    `).join("");
+
+    const spellRows = [];
+    if (isSpellcaster(p.name)) {
+      const knownSpells = Array.isArray(p.spells)
+        ? Array.from({ length: SPELL_SLOTS }, (_, i) => p.spells[i] || { id: "", status: "ready" })
+        : [];
+      for (let i = 0; i < SPELL_SLOTS; i++) {
+        const entry = knownSpells[i] || { id: "", status: "ready" };
+        spellRows.push(`
+          <div class="row spell-row">
+            <label>Spell ${i + 1}
+              <select data-k="spellId" data-si="${i}" data-i="${idx}">
+                <option value="">— None —</option>
+                ${SPELLS.map(sp => `<option value="${sp.id}" ${entry.id === sp.id ? "selected" : ""}>${escapeHtml(sp.name)} (Recharge ${sp.recharge})</option>`).join("")}
+              </select>
+            </label>
+            <label>Status
+              <select data-k="spellStatus" data-si="${i}" data-i="${idx}">
+                <option value="ready" ${entry.status !== "exhausted" ? "selected" : ""}>Charged</option>
+                <option value="exhausted" ${entry.status === "exhausted" ? "selected" : ""}>Exhausted</option>
+              </select>
+            </label>
+          </div>
+        `);
+      }
+    }
+
     div.innerHTML = `
       <div class="row">
         <label>Name
@@ -507,6 +603,12 @@ function renderEditors() {
           </select>
         </label>
         <label>Fighting <input type="number" min="0" max="50" data-k="fighting" data-i="${idx}" value="${p.fighting}"></label>
+        <label>Stealth <input type="number" min="0" max="50" data-k="stealth" data-i="${idx}" value="${p.stealth ?? 0}"></label>
+        <label>Lore <input type="number" min="0" max="50" data-k="lore" data-i="${idx}" value="${p.lore ?? 0}"></label>
+        <label>Survival <input type="number" min="0" max="50" data-k="survival" data-i="${idx}" value="${p.survival ?? 0}"></label>
+        <label>Charisma <input type="number" min="0" max="50" data-k="charisma" data-i="${idx}" value="${p.charisma ?? 0}"></label>
+      </div>
+      <div class="row">
         <label>Armour <input type="number" min="0" max="50" data-k="armour" data-i="${idx}" value="${p.armour}"></label>
         <label>Max HP <input type="number" min="1" max="999" data-k="maxHealth" data-i="${idx}" value="${p.maxHealth}"></label>
         <label>HP <input type="number" min="0" max="999" data-k="health" data-i="${idx}" value="${p.health}"></label>
@@ -518,6 +620,15 @@ function renderEditors() {
         </label>
         <button data-del-party="${idx}">Remove</button>
       </div>
+      <div class="row equipment-grid">${equipmentRows}</div>
+      <div class="row">
+        <label class="notes">Notes
+          <textarea data-k="notes" data-i="${idx}" spellcheck="false">${escapeHtml(p.notes || "")}</textarea>
+        </label>
+      </div>
+      ${isSpellcaster(p.name)
+        ? `<div class="card spell-card">${spellRows.join("")}</div>`
+        : `<div class="muted">Not a spellcaster.</div>`}
     `;
     pe.appendChild(div);
   });
@@ -543,7 +654,7 @@ function renderEditors() {
     me.appendChild(div);
   });
 
-  pe.querySelectorAll("input,select").forEach(el => el.addEventListener("change", onPartyEdit));
+  pe.querySelectorAll("input,select,textarea").forEach(el => el.addEventListener("change", onPartyEdit));
   pe.querySelectorAll("button[data-del-party]").forEach(el => el.addEventListener("click", (e) => {
     const i = Number(e.target.getAttribute("data-del-party"));
     state.party.splice(i, 1);
@@ -579,15 +690,43 @@ function onPartyEdit(e) {
   const k = el.getAttribute("data-k");
   if (i < 0 || i >= state.party.length) return;
   const p = state.party[i];
+  if (!Array.isArray(p.equipment)) p.equipment = Array.from({ length: EQUIPMENT_SLOTS }, () => "");
+  if (!Array.isArray(p.spells)) p.spells = Array.from({ length: SPELL_SLOTS }, () => ({ id: "", status: "ready" }));
 
   if (k === "name") p.name = el.value || HERO_NAMES[0];
   if (k === "fighting") p.fighting = clampInt(el.value, 0, 50, p.fighting);
+  if (k === "stealth") p.stealth = clampInt(el.value, 0, 50, p.stealth);
+  if (k === "lore") p.lore = clampInt(el.value, 0, 50, p.lore);
+  if (k === "survival") p.survival = clampInt(el.value, 0, 50, p.survival);
+  if (k === "charisma") p.charisma = clampInt(el.value, 0, 50, p.charisma);
   if (k === "armour") p.armour = clampInt(el.value, 0, 50, p.armour);
   if (k === "maxHealth") { p.maxHealth = clampInt(el.value, 1, 999, p.maxHealth); p.health = Math.min(p.health, p.maxHealth); }
   if (k === "health") p.health = clampInt(el.value, 0, 999, p.health);
   if (k === "hasWeapon") p.hasWeapon = (el.value === "true");
+  if (k === "equipment") {
+    const slot = Number(el.getAttribute("data-ei"));
+    if (slot >= 0 && slot < EQUIPMENT_SLOTS) p.equipment[slot] = el.value || "";
+  }
+  if (k === "notes") p.notes = el.value || "";
+  if (k === "spellId") {
+    const slot = Number(el.getAttribute("data-si"));
+    if (slot >= 0 && slot < SPELL_SLOTS) {
+      const status = p.spells[slot]?.status || "ready";
+      p.spells[slot] = { id: el.value, status: el.value ? status : "ready" };
+    }
+  }
+  if (k === "spellStatus") {
+    const slot = Number(el.getAttribute("data-si"));
+    if (slot >= 0 && slot < SPELL_SLOTS) {
+      const id = p.spells[slot]?.id || "";
+      p.spells[slot] = { id, status: el.value === "exhausted" ? "exhausted" : "ready" };
+    }
+  }
 
   enforceUniquePartyNames();
+  if (!isSpellcaster(p.name)) {
+    p.spells = Array.from({ length: SPELL_SLOTS }, () => ({ id: "", status: "ready" }));
+  }
   state.battleSeed = null;
   saveSetupToStorage(state);
   renderAll();
@@ -786,7 +925,7 @@ function openSpellDialog() {
   state.party.forEach((p, idx) => {
     const opt = document.createElement("option");
     opt.value = String(idx);
-    const allowedCaster = SPELLCASTER_NAMES.has(p.name);
+    const allowedCaster = isSpellcaster(p.name);
     const suffix = `${allowedCaster ? "" : " (cannot cast)"}${p.actedThisRound ? " (acted)" : ""}${(p.dead||p.health<=0) ? " (dead)" : ""}`;
     opt.textContent = `${p.name}${suffix}`;
     opt.disabled = !!(!allowedCaster || p.dead || p.health<=0 || p.actedThisRound);
@@ -795,13 +934,35 @@ function openSpellDialog() {
 
   // spells list: disable if used by selected caster (updated on change)
   const spellSel = $("spellSelect");
-  spellSel.innerHTML = "";
-  for (const sp of SPELLS) {
-    const opt = document.createElement("option");
-    opt.value = sp.id;
-    opt.textContent = sp.name;
-    spellSel.appendChild(opt);
-  }
+  const renderSpellOptions = () => {
+    spellSel.innerHTML = "";
+    const cidx = Number(casterSel.value);
+    const caster = state.party[cidx];
+    const known = caster?.spells?.filter(s => s.id) || [];
+
+    if (!known.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "No spells prepared";
+      opt.disabled = true;
+      spellSel.appendChild(opt);
+      spellSel.disabled = true;
+      const area = $("spellTargetArea");
+      area.innerHTML = `<div class="muted">${caster ? "No prepared spells for this caster." : "Select a caster."}</div>`;
+      return;
+    }
+
+    spellSel.disabled = false;
+    for (const entry of known) {
+      const sp = getSpellById(entry.id);
+      if (!sp) continue;
+      const opt = document.createElement("option");
+      const statusSuffix = entry.status === "exhausted" ? " (exhausted)" : "";
+      opt.value = sp.id;
+      opt.textContent = `${sp.name}${statusSuffix}`;
+      spellSel.appendChild(opt);
+    }
+  };
 
   const refreshSpellDisabled = () => {
     const cidx = Number(casterSel.value);
@@ -812,6 +973,9 @@ function openSpellDialog() {
       const chk = canCastSpell(caster, sp);
       opt.disabled = !chk.ok;
     }
+    const okBtn = $("spellOk");
+    const hasEnabled = [...spellSel.options].some(o => !o.disabled);
+    okBtn.disabled = spellSel.disabled || !hasEnabled;
     renderSpellTargetUI();
   };
 
@@ -906,9 +1070,10 @@ function openSpellDialog() {
     }
   };
 
-  casterSel.onchange = refreshSpellDisabled;
+  casterSel.onchange = () => { renderSpellOptions(); refreshSpellDisabled(); };
   spellSel.onchange = renderSpellTargetUI;
 
+  renderSpellOptions();
   refreshSpellDisabled();
   $("spellDialog").showModal();
 }
@@ -980,6 +1145,13 @@ function endCombatManual() {
 function initUI() {
   // Buttons
   $("startCombat").addEventListener("click", startOrRestartCombat);
+  document.querySelectorAll(".tab-button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const target = btn.getAttribute("data-tab");
+      document.querySelectorAll(".tab-button").forEach(b => b.classList.toggle("active", b === btn));
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === target));
+    });
+  });
   $("playerAttack").addEventListener("click", () => {
     partyAttack(Number($("playerAttacker").value), Number($("playerTarget").value));
   });
