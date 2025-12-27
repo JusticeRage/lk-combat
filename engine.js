@@ -42,8 +42,8 @@ export function computeEnemyHits(atkDice, atkTarget) {
 }
 
 // --- Buff handling (simple) ---
-export function getEffectiveArmour(member) {
-  const base = member.armour || 0;
+export function getEffectiveArmour(member, bonusArmour = 0) {
+  const base = (member.armour || 0) + (bonusArmour || 0);
   const buffs = Array.isArray(member.buffs) ? member.buffs : [];
   const add = buffs
     .filter(b => b.type === "armour" && (b.until === "battleEnd" || b.untilRound == null || b.untilRound >= 0))
