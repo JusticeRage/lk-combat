@@ -7,7 +7,7 @@ export const ITEMS = [
   { id: "iron_shortsword", name: "Iron Shortsword", modifiers: { fighting: 1 }, hands: 1, type: "weapon" },
   { id: "crude_blade", name: "Crude Blade", modifiers: { fighting: 1 }, hands: 1, type: "weapon" },
   { id: "maul", name: "Maul", modifiers: { fighting: 1 }, hands: 2, type: "weapon" },
-  { id: "hide_armour", name: "Hide Armor", modifiers: { armour: 1 } },
+  { id: "hide_armour", name: "Hide Armour", modifiers: { armour: 1 } },
   { id: "reference_book", name: "Reference book", modifiers: { lore: 1 } },
   { id: "talisman_saint_elias", name: "Talisman of Saint Elias", modifiers: {} },
   { id: "engagement_ring", name: "Engagement Ring", modifiers: {} },

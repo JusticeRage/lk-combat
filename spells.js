@@ -2,6 +2,7 @@ export const SPELLS = [
   {
     id: "poison_stream",
     name: "Poison Stream",
+    type: "combat",
     timing: "combat",
     oncePerBattle: true,
     recharge: 50,
@@ -14,6 +15,7 @@ export const SPELLS = [
   {
     id: "unfailing_strike",
     name: "Unfailing Strike",
+    type: "combat",
     timing: "combat",
     oncePerBattle: true,
     recharge: 50,
@@ -25,6 +27,7 @@ export const SPELLS = [
   {
     id: "armour_of_heaven",
     name: "Armour of Heaven",
+    type: "combat",
     timing: "combat",
     oncePerBattle: true,
     recharge: 50,
@@ -36,6 +39,7 @@ export const SPELLS = [
   {
     id: "ice_bolt",
     name: "Ice Bolt",
+    type: "combat",
     timing: "combat",
     oncePerBattle: true,
     recharge: 50,
@@ -47,6 +51,7 @@ export const SPELLS = [
   {
     id: "soothing_touch",
     name: "Soothing Touch",
+    type: "combat",
     timing: "combatOrAdventure",
     oncePerBattle: true,
     recharge: 50,
@@ -54,6 +59,33 @@ export const SPELLS = [
     steps: [
       { type: "healFixed", amount: 5 },
     ],
+  },
+  {
+    id: "animal_speech",
+    name: "Animal Speech",
+    type: "adventure",
+    timing: "adventure",
+    recharge: 50,
+    targetMode: null,
+    steps: [],
+  },
+  {
+    id: "wolf_spirit",
+    name: "Wolf Spirit",
+    type: "adventure",
+    timing: "adventure",
+    recharge: 75,
+    targetMode: null,
+    steps: [],
+  },
+  {
+    id: "magic_cabinet",
+    name: "Magic Cabinet",
+    type: "adventure",
+    timing: "adventure",
+    recharge: 100,
+    targetMode: null,
+    steps: [],
   },
 ];
 
