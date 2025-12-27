@@ -23,6 +23,17 @@ th { font-size: 12px; opacity: .9; }
 .muted { opacity: .8; font-size: 12px; }
 .right { margin-left: auto; }
 .nowrap { white-space: nowrap; }
+.tabs { display: flex; gap: 8px; margin: 12px 0; }
+.tab-button { border-radius: 999px; padding: 8px 14px; border: 1px solid rgba(127,127,127,.35); background: rgba(127,127,127,.1); }
+.tab-button.active { background: rgba(127,127,127,.2); font-weight: 600; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+.equipment-grid { align-items: flex-start; }
+.equip-label { flex: 1 1 190px; min-width: 180px; }
+.notes { flex: 1 1 100%; }
+.notes textarea { width: 100%; min-height: 80px; }
+.spell-card { background: rgba(127,127,127,.05); }
+.spell-row label { flex: 1 1 200px; min-width: 200px; }
 dialog { border: 1px solid rgba(127,127,127,.35); border-radius: 12px; padding: 12px; max-width: 720px; width: calc(100vw - 32px); }
 dialog::backdrop { background: rgba(0,0,0,.35); }
 .dlg-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px; }

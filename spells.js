@@ -4,6 +4,7 @@ export const SPELLS = [
     name: "Poison Stream",
     timing: "combat",
     oncePerBattle: true,
+    recharge: 50,
     targetMode: "multiEnemyDistinct",
     targetCount: 2,
     steps: [
@@ -15,6 +16,7 @@ export const SPELLS = [
     name: "Unfailing Strike",
     timing: "combat",
     oncePerBattle: true,
+    recharge: 50,
     targetMode: "singleEnemy",
     steps: [
       { type: "damageFixed", amount: 3, bypassDefence: true },
@@ -25,6 +27,7 @@ export const SPELLS = [
     name: "Armour of Heaven",
     timing: "combat",
     oncePerBattle: true,
+    recharge: 50,
     targetMode: "singleAlly",
     steps: [
       { type: "buffArmour", amount: 3, duration: "battle" },
@@ -35,6 +38,7 @@ export const SPELLS = [
     name: "Ice Bolt",
     timing: "combat",
     oncePerBattle: true,
+    recharge: 50,
     targetMode: "singleEnemy",
     steps: [
       { type: "attackFixed", fighting: 8, times: 1 },
@@ -45,6 +49,7 @@ export const SPELLS = [
     name: "Soothing Touch",
     timing: "combatOrAdventure",
     oncePerBattle: true,
+    recharge: 50,
     targetMode: "singleAlly",
     steps: [
       { type: "healFixed", amount: 5 },

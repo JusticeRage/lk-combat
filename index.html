@@ -67,7 +67,12 @@
     </div>
   </dialog>
 
-  <div class="grid two" style="margin-top:12px;">
+  <div class="tabs" role="tablist">
+    <button class="tab-button active" data-tab="partyTab">Party</button>
+    <button class="tab-button" data-tab="battleTab">Opponents &amp; Combat</button>
+  </div>
+
+  <div id="partyTab" class="tab-panel active">
     <div class="card">
       <h2>Party (up to 4)</h2>
       <div id="partyEditor"></div>
@@ -77,7 +82,9 @@
         <button id="resetSavedParty" class="right">Reset saved party</button>
       </div>
     </div>
+  </div>
 
+  <div id="battleTab" class="tab-panel">
     <div class="card">
       <h2>Opponents</h2>
       <div class="row" style="margin-bottom:10px;">
@@ -90,74 +97,74 @@
         <button id="clearMobs">Clear</button>
       </div>
     </div>
-  </div>
 
-  <div class="grid two" style="margin-top:12px;">
-    <div class="card">
-      <h2>Combat</h2>
+    <div class="grid two" style="margin-top:12px;">
+      <div class="card">
+        <h2>Combat</h2>
 
-      <div class="row">
-        <span class="pill" id="phasePill">Phase: —</span>
-        <span class="pill" id="roundPill">Round: 1</span>
-        <button class="right" id="startCombat">Start / Restart combat</button>
-      </div>
-
-      <div style="margin-top:12px;" class="card">
         <div class="row">
-          <div class="pill" id="turnPill">Turn: —</div>
-          <div class="muted" id="turnHelp"></div>
+          <span class="pill" id="phasePill">Phase: —</span>
+          <span class="pill" id="roundPill">Round: 1</span>
+          <button class="right" id="startCombat">Start / Restart combat</button>
         </div>
 
-        <div id="playerControls" style="margin-top:10px;">
+        <div style="margin-top:12px;" class="card">
           <div class="row">
-            <label>Attacker (party)
-              <select id="playerAttacker"></select>
-            </label>
-            <label>Target (opponent)
-              <select id="playerTarget"></select>
-            </label>
-            <button class="primary" id="playerAttack">Attack</button>
-            <button id="playerSpell">Cast spell</button>
-            <button id="playerSkip">Skip (end party turn)</button>
+            <div class="pill" id="turnPill">Turn: —</div>
+            <div class="muted" id="turnHelp"></div>
           </div>
-          <div class="muted" style="margin-top:6px;">
-            Heroes who already acted this round are disabled.
+
+          <div id="playerControls" style="margin-top:10px;">
+            <div class="row">
+              <label>Attacker (party)
+                <select id="playerAttacker"></select>
+              </label>
+              <label>Target (opponent)
+                <select id="playerTarget"></select>
+              </label>
+              <button class="primary" id="playerAttack">Attack</button>
+              <button id="playerSpell">Cast spell</button>
+              <button id="playerSkip">Skip (end party turn)</button>
+            </div>
+            <div class="muted" style="margin-top:6px;">
+              Heroes who already acted this round are disabled.
+            </div>
+          </div>
+
+          <div id="enemyControls" style="margin-top:10px; display:none;">
+            <div class="row">
+              <label>Current enemy
+                <select id="enemyCurrent" disabled></select>
+              </label>
+              <label>Assign hits to party member
+                <select id="enemyVictim"></select>
+              </label>
+              <button class="primary" id="enemyResolveOne">Resolve this enemy attack</button>
+              <button id="enemyResolveAll">Resolve all remaining enemy attacks</button>
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:12px;">
+            <button id="undo">Undo</button>
+            <button id="endCombat" class="right">End combat (manual)</button>
           </div>
         </div>
 
-        <div id="enemyControls" style="margin-top:10px; display:none;">
-          <div class="row">
-            <label>Current enemy
-              <select id="enemyCurrent" disabled></select>
-            </label>
-            <label>Assign hits to party member
-              <select id="enemyVictim"></select>
-            </label>
-            <button class="primary" id="enemyResolveOne">Resolve this enemy attack</button>
-            <button id="enemyResolveAll">Resolve all remaining enemy attacks</button>
-          </div>
-        </div>
+        <h2>Party status</h2>
+        <div id="partyTable"></div>
 
-        <div class="row" style="margin-top:12px;">
-          <button id="undo">Undo</button>
-          <button id="endCombat" class="right">End combat (manual)</button>
-        </div>
+        <h2>Opponent status</h2>
+        <div id="mobTable"></div>
       </div>
 
-      <h2>Party status</h2>
-      <div id="partyTable"></div>
-
-      <h2>Opponent status</h2>
-      <div id="mobTable"></div>
-    </div>
-
-    <div class="card">
-      <h2>Log</h2>
-      <div class="row" style="margin-bottom:8px;">
-        <button id="copyLog">Copy log</button>
-        <button id="clearLog">Clear log</button>
+      <div class="card">
+        <h2>Log</h2>
+        <div class="row" style="margin-bottom:8px;">
+          <button id="copyLog">Copy log</button>
+          <button id="clearLog">Clear log</button>
+        </div>
+        <div id="log" class="log"></div>
       </div>
-      <div id="log" class="log"></div>
     </div>
   </div>
 
