@@ -19,6 +19,14 @@ const LS_KEY = "lk_combat_tracker_v3";
 
 const $ = (id) => document.getElementById(id);
 
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
 function saveSetupToStorage(state) {
   const payload = {
     party: state.party.map(p => ({
@@ -743,6 +751,7 @@ function renderAll() {
 // --- Dialogs: hero picker ---
 function openHeroDialog() {
   if (state.party.length >= 4) return;
+
   const used = new Set(state.party.map(p => p.name));
   const available = HERO_NAMES.filter(n => !used.has(n));
 
