@@ -357,6 +357,7 @@ function loadSetupFromStorage(state) {
         .filter(p => p && HERO_NAMES.includes(p.name) && !seen.has(p.name) && (seen.add(p.name), true))
         .slice(0, 4)
         .map(p => newMember(p.name, p));
+      state.selectedPartyIndex = 0;
     }
 
     if (Array.isArray(obj.mobs)) {
@@ -478,6 +479,7 @@ const state = {
   log: [],
   history: [],
   battleSeed: null,   // snapshot for restart
+  selectedPartyIndex: 0,
 };
 
 function pushLog(line) {
@@ -495,7 +497,7 @@ function snapshot() {
   state.history.push(deepClone({
     phase: state.phase, round: state.round, turn: state.turn,
     party: state.party, mobs: state.mobs, enemyIndex: state.enemyIndex,
-    log: state.log, battleSeed: state.battleSeed
+    log: state.log, battleSeed: state.battleSeed, selectedPartyIndex: state.selectedPartyIndex
   }));
   if (state.history.length > 50) state.history.shift();
   $("undo").disabled = state.history.length === 0;
@@ -512,6 +514,8 @@ function undo() {
   state.enemyIndex = last.enemyIndex;
   state.log = last.log;
   state.battleSeed = last.battleSeed;
+  state.selectedPartyIndex = Number.isInteger(last.selectedPartyIndex) ? last.selectedPartyIndex : 0;
+  clampSelectedPartyIndex();
   renderAll();
 }
 
@@ -593,6 +597,7 @@ function restoreFromSeed() {
   state.turn = "party";
   state.enemyIndex = 0;
   state.party = deepClone(state.battleSeed.party);
+  clampSelectedPartyIndex();
   state.mobs = deepClone(state.battleSeed.mobs);
   state.log = [];
   pushLog(`=== Combat restarted (${nowStamp()}) ===`);
@@ -831,6 +836,15 @@ function castSpell({ casterIdx, spellId, targets }) {
 }
 
 // --- UI rendering ---
+function clampSelectedPartyIndex() {
+  if (!Array.isArray(state.party) || state.party.length === 0) {
+    state.selectedPartyIndex = 0;
+    return;
+  }
+  const current = Number.isInteger(state.selectedPartyIndex) ? state.selectedPartyIndex : 0;
+  state.selectedPartyIndex = Math.min(Math.max(current, 0), state.party.length - 1);
+}
+
 function renderEditors() {
   const pe = $("partyEditor");
   const openSpellCards = new Set(
@@ -867,9 +881,44 @@ function renderEditors() {
   `;
   pe.appendChild(partyMeta);
 
+  clampSelectedPartyIndex();
+
+  const layout = document.createElement("div");
+  layout.className = "lk-party-shell";
+
+  const rail = document.createElement("div");
+  rail.className = "lk-portrait-rail";
+
   state.party.forEach((p, idx) => {
-    const div = document.createElement("div");
-    div.className = "panel panel-default hero-card party-card";
+    const stats = computeDisplayedStats(p);
+    const hpText = `${Math.max(0, p.health)}/${p.maxHealth} HP`;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `lk-portrait-tab${idx === state.selectedPartyIndex ? " is-active" : ""}`;
+    btn.setAttribute("data-hero-tab", String(idx));
+    btn.setAttribute("aria-pressed", idx === state.selectedPartyIndex ? "true" : "false");
+    btn.innerHTML = `
+      <img src="${getHeroImage(p.name)}" alt="${escapeHtml(p.name)} portrait" class="lk-portrait-thumb">
+      <div class="text-start">
+        <p class="lk-portrait-name mb-1">${escapeHtml(p.name)}</p>
+        <div class="lk-portrait-meta">${escapeHtml(formatStatBadge("fighting", stats.fighting))} • HP ${hpText}</div>
+      </div>
+    `;
+    rail.appendChild(btn);
+  });
+
+  if (!state.party.length) {
+    rail.innerHTML = `<div class="lk-empty-sheet">No party portraits yet.</div>`;
+  }
+
+  layout.appendChild(rail);
+
+  const detailArea = document.createElement("div");
+
+  if (!state.party.length) {
+    detailArea.innerHTML = `<div class="lk-empty-sheet">Add up to four heroes to start managing their sheets.</div>`;
+  } else {
+    const p = state.party[state.selectedPartyIndex];
     enforceWeaponHandLimit(p);
     const equipment = normalizeEquipmentList(p.equipment, { keepEmpty: true });
     const statBadges = (() => {
@@ -891,24 +940,24 @@ function renderEditors() {
         <div class="row g-3 align-items-center">
           <div class="col-md-6">
             <label class="form-label small">Item</label>
-            <input type="text" class="form-control form-control-sm" list="itemOptions" data-k="equipment" data-field="name" data-ei="${slot}" data-i="${idx}" value="${itemLabel}" placeholder="Item name">
+            <input type="text" class="form-control form-control-sm" list="itemOptions" data-k="equipment" data-field="name" data-ei="${slot}" data-i="${state.selectedPartyIndex}" value="${itemLabel}" placeholder="Item name">
           </div>
           ${item?.countable ? `
             <div class="col-sm-6 col-md-2">
               <label class="form-label small">Count</label>
-              <input type="number" class="form-control form-control-sm" min="1" max="999" data-k="equipment" data-field="count" data-ei="${slot}" data-i="${idx}" value="${eq.count || 1}">
+              <input type="number" class="form-control form-control-sm" min="1" max="999" data-k="equipment" data-field="count" data-ei="${slot}" data-i="${state.selectedPartyIndex}" value="${eq.count || 1}">
             </div>
           ` : ""}
           ${isWeapon ? `
             <div class="col-sm-6 col-md-2">
               <div class="form-check mb-0">
-                <input class="form-check-input" type="checkbox" data-k="equipment" data-field="equipped" data-ei="${slot}" data-i="${idx}" ${eq.equipped ? "checked" : ""} id="equip-${idx}-${slot}">
-                <label class="form-check-label small" for="equip-${idx}-${slot}">Equipped</label>
+                <input class="form-check-input" type="checkbox" data-k="equipment" data-field="equipped" data-ei="${slot}" data-i="${state.selectedPartyIndex}" ${eq.equipped ? "checked" : ""} id="equip-${state.selectedPartyIndex}-${slot}">
+                <label class="form-check-label small" for="equip-${state.selectedPartyIndex}-${slot}">Equipped</label>
               </div>
             </div>
           ` : ""}
           <div class="col-sm-6 col-md-2 text-end">
-            <button class="btn btn-outline-danger btn-sm" data-del-equipment="${slot}" data-i="${idx}">Remove</button>
+            <button class="btn btn-outline-danger btn-sm" data-del-equipment="${slot}" data-i="${state.selectedPartyIndex}">Remove</button>
           </div>
         </div>
         <div class="muted equip-help">${escapeHtml(item ? describeItem(item, eq) : (eq.custom ? "Custom item" : "No item"))}</div>
@@ -919,7 +968,7 @@ function renderEditors() {
     const equipmentMeta = `
       <div class="d-flex justify-content-between align-items-center equipment-meta">
         <div class="muted small">${equipment.length}/${EQUIPMENT_SLOTS} slots used</div>
-        <button class="btn btn-outline-primary btn-sm" data-add-equipment="${idx}" ${equipment.length >= EQUIPMENT_SLOTS ? "disabled" : ""}>Add slot</button>
+        <button class="btn btn-outline-primary btn-sm" data-add-equipment="${state.selectedPartyIndex}" ${equipment.length >= EQUIPMENT_SLOTS ? "disabled" : ""}>Add slot</button>
       </div>
     `;
 
@@ -931,15 +980,15 @@ function renderEditors() {
       for (let i = 0; i < SPELL_SLOTS; i++) {
         const entry = knownSpells[i] || { id: "", status: "ready" };
         spellRows.push(`
-          <div class="row spell-row">
-            <label>Spell ${i + 1}
-              <select data-k="spellId" data-si="${i}" data-i="${idx}" class="form-control input-sm">
+          <div class="spell-row">
+            <label class="form-label mb-1">Spell ${i + 1}
+              <select data-k="spellId" data-si="${i}" data-i="${state.selectedPartyIndex}" class="form-select form-select-sm">
                 <option value="">— None —</option>
                 ${SPELLS.map(sp => `<option value="${sp.id}" ${entry.id === sp.id ? "selected" : ""}>${escapeHtml(formatSpellOptionLabel(sp))}</option>`).join("")}
               </select>
             </label>
-            <label>Status
-              <select data-k="spellStatus" data-si="${i}" data-i="${idx}" class="form-control input-sm">
+            <label class="form-label mb-1">Status
+              <select data-k="spellStatus" data-si="${i}" data-i="${state.selectedPartyIndex}" class="form-select form-select-sm">
                 <option value="ready" ${entry.status !== "exhausted" ? "selected" : ""}>Charged</option>
                 <option value="exhausted" ${entry.status === "exhausted" ? "selected" : ""}>Exhausted</option>
               </select>
@@ -949,44 +998,69 @@ function renderEditors() {
       }
     }
 
-    div.innerHTML = `
-      <div class="panel-body">
-        <div class="hero-heading">
-          <img src="${getHeroImage(p.name)}" alt="${escapeHtml(p.name)} portrait" class="hero-avatar">
-          <div class="hero-meta">
-            <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 hero-meta__row">
-              <div class="hero-name" aria-label="Character name">${escapeHtml(p.name)}</div>
-              <div class="d-flex justify-content-end gap-2 flex-wrap">
-                <button class="btn btn-outline-secondary btn-sm" data-edit-stats="${idx}">Edit stats</button>
-                <button class="btn btn-default btn-sm" data-del-party="${idx}">Remove</button>
+    const sheet = document.createElement("div");
+    sheet.className = "lk-party-sheet";
+    sheet.innerHTML = `
+      <div class="lk-sheet__header">
+        <div class="lk-sheet__topline">
+          <img src="${getHeroImage(p.name)}" alt="${escapeHtml(p.name)} portrait" class="lk-sheet__portrait">
+          <div>
+            <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+              <div>
+                <div class="lk-name-chip" aria-label="Character name">${escapeHtml(p.name)}</div>
+                <div class="lk-chipline">${statBadges}</div>
+              </div>
+              <div class="lk-sheet__cta">
+                <button class="btn btn-outline-secondary btn-sm" data-edit-stats="${state.selectedPartyIndex}">Edit stats</button>
+                <button class="btn btn-outline-danger btn-sm" data-del-party="${state.selectedPartyIndex}">Remove</button>
               </div>
             </div>
-            <div class="stat-summary">${statBadges}</div>
           </div>
         </div>
-        <div class="equipment-stack">
-          ${equipmentRows || `<div class="muted small">No equipment yet.</div>`}
-          ${equipmentMeta}
+      </div>
+      <div class="lk-sheet__body">
+        <div class="lk-sheet__grid">
+          <div class="lk-section">
+            <div class="lk-section-heading">
+              <p class="lk-section-title mb-0">Equipment</p>
+              <span class="text-secondary small">Weapons, armour, and gear</span>
+            </div>
+            <div class="equipment-stack">
+              ${equipmentRows || `<div class="muted small">No equipment yet.</div>`}
+              ${equipmentMeta}
+            </div>
+          </div>
+          <div class="lk-section">
+            <div class="lk-section-heading">
+              <p class="lk-section-title mb-0">Notes</p>
+              <span class="text-secondary small">Reminders for this hero</span>
+            </div>
+            <textarea data-k="notes" data-i="${state.selectedPartyIndex}" spellcheck="false" class="form-control lk-notes">${escapeHtml(p.notes || "")}</textarea>
+          </div>
+          ${isSpellcaster(p.name) ? `
+            <div class="lk-section">
+              <div class="lk-section-heading">
+                <p class="lk-section-title mb-0">Spells</p>
+                <span class="text-secondary small">${spellRows.length} slots</span>
+              </div>
+              <details class="spell-card" data-hero="${escapeHtml(p.name)}" ${openSpellCards.has(p.name) ? "open" : ""}>
+                <summary>
+                  <span>Known spells</span>
+                  <span class="spell-count text-secondary small">${spellRows.length} slots</span>
+                </summary>
+                <div class="spell-body">${spellRows.join("")}</div>
+              </details>
+            </div>
+          ` : ""}
         </div>
-        <div class="row">
-          <label class="notes">Notes
-            <textarea data-k="notes" data-i="${idx}" spellcheck="false" class="form-control">${escapeHtml(p.notes || "")}</textarea>
-          </label>
-        </div>
-        ${isSpellcaster(p.name) ? `
-          <details class="spell-card" data-hero="${escapeHtml(p.name)}" ${openSpellCards.has(p.name) ? "open" : ""}>
-            <summary>
-              <span>Spells</span>
-              <span class="spell-count text-secondary small">${spellRows.length} slots</span>
-            </summary>
-            <div class="spell-body">${spellRows.join("")}</div>
-          </details>
-        ` : ""}
       </div>
     `;
-    pe.appendChild(div);
-  });
 
+    detailArea.appendChild(sheet);
+  }
+
+  layout.appendChild(detailArea);
+  pe.appendChild(layout);
   const me = $("mobEditor");
   me.innerHTML = "";
   state.mobs.forEach((m, idx) => {
@@ -1008,6 +1082,13 @@ function renderEditors() {
     `;
     me.appendChild(div);
   });
+
+  pe.querySelectorAll("[data-hero-tab]").forEach(el => el.addEventListener("click", (e) => {
+    const i = Number(el.getAttribute("data-hero-tab"));
+    if (Number.isNaN(i)) return;
+    state.selectedPartyIndex = i;
+    renderAll();
+  }));
 
   pe.querySelectorAll("[data-k]").forEach(el => el.addEventListener("change", onPartyEdit));
   pe.querySelectorAll("button[data-add-equipment]").forEach(el => el.addEventListener("click", (e) => {
@@ -1041,6 +1122,7 @@ function renderEditors() {
   pe.querySelectorAll("button[data-del-party]").forEach(el => el.addEventListener("click", (e) => {
     const i = Number(e.target.getAttribute("data-del-party"));
     state.party.splice(i, 1);
+    clampSelectedPartyIndex();
     state.battleSeed = null;
     saveSetupToStorage(state);
     renderAll();
@@ -1635,6 +1717,7 @@ function initUI() {
   $("clearParty").addEventListener("click", () => {
     if (!confirm("Clear party setup and saved data?")) return;
     state.party = [];
+    state.selectedPartyIndex = 0;
     state.battleSeed = null;
     try {
       const raw = localStorage.getItem(LS_KEY);
@@ -1694,6 +1777,7 @@ function initUI() {
     if (state.party.some(p => p.name === name)) return; // no duplicates
 
     state.party.push(newMember(name));
+    state.selectedPartyIndex = state.party.length - 1;
     state.battleSeed = null;
     saveSetupToStorage(state);
     bsModalHide("heroDialog");
@@ -1735,6 +1819,7 @@ function initUI() {
 function initState() {
   if (!loadSetupFromStorage(state)) {
     state.party = [ newMember("Akihiro of Chalice", { fighting: 4, armour: 0, health: 8, maxHealth: 8 }) ];
+    state.selectedPartyIndex = 0;
     state.mobs = [ { name: "Goblin", atkDice: 4, atkTarget: 5, auto: 0, defTarget: 4, health: 6, maxHealth: 6, dead: false } ];
     state.silverCoins = 0;
     saveSetupToStorage(state);
