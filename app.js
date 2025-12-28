@@ -55,6 +55,11 @@ const CODE_BOOKS = [
   { key: "F", title: "Drakehallow", length: DEFAULT_CODES_PER_BOOK },
 ];
 
+const GARRISON_OPTIONS = [
+  { value: "", label: "— None —" },
+  { value: "Luutanesh", label: "Luutanesh" },
+];
+
 const STAT_LABELS = {
   fighting: "Fighting",
   stealth: "Stealth",
@@ -145,6 +150,26 @@ function normalizeSkillCheck(raw) {
     latestRoll: buildLatestRoll(raw.latestRoll?.groups || []),
     lastResult,
   };
+}
+
+function normalizeGarrison(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeArmy(raw) {
+  const base = { name: "", strength: 0, morale: 0, garrison: "" };
+  if (!raw || typeof raw !== "object") return base;
+  return {
+    name: typeof raw.name === "string" ? raw.name.trim() : base.name,
+    strength: clampInt(raw.strength, 0, 999, base.strength),
+    morale: clampInt(raw.morale, 0, 999, base.morale),
+    garrison: normalizeGarrison(raw.garrison),
+  };
+}
+
+function normalizeArmies(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(normalizeArmy);
 }
 
 function bsModalShow(id) {
@@ -533,10 +558,17 @@ function saveSetupToStorage(state) {
   state.selectedCodeBook = normalizeBookKey(state.selectedCodeBook);
   state.vault = normalizeVaultItems(state.vault);
   state.missionNotes = typeof state.missionNotes === "string" ? state.missionNotes : "";
+  state.armies = normalizeArmies(state.armies);
   const payload = {
     silverCoins: state.silverCoins || 0,
     vault: state.vault,
     missionNotes: state.missionNotes,
+    armies: state.armies.map(a => ({
+      name: a.name,
+      strength: a.strength,
+      morale: a.morale,
+      garrison: a.garrison,
+    })),
     party: state.party.map(p => ({
       name: p.name,
       fighting: p.fighting,
@@ -584,6 +616,7 @@ function loadSetupFromStorage(state) {
     state.silverCoins = clampInt(obj.silverCoins, 0, 999999, 0);
     state.vault = normalizeVaultItems(obj.vault);
     state.missionNotes = typeof obj.missionNotes === "string" ? obj.missionNotes : "";
+    state.armies = normalizeArmies(obj.armies);
 
     if (Array.isArray(obj.party)) {
       const seen = new Set();
@@ -740,6 +773,23 @@ function parseSkillCheckImport(text) {
   return normalizeSkillCheck({ name, type, skill: skillKey, dc, requiredSuccesses, participants: [] });
 }
 
+function parseArmiesImport(text) {
+  const lines = text.replace(/\r/g, "").split("\n").map(l => l.trim()).filter(Boolean);
+  if (!lines.length) throw new Error("No lines found.");
+
+  const armies = [];
+  const regex = /^(.*?)\s*[–-]\s*Strength\s*(\d+)\s*[;,]?\s*Morale\s*(\d+)/i;
+
+  lines.forEach((line, idx) => {
+    const match = line.match(regex);
+    if (!match) throw new Error(`Line ${idx + 1} could not be read. Expected "Name – Strength X, Morale Y".`);
+    const [, name, strength, morale] = match;
+    armies.push(normalizeArmy({ name, strength: Number(strength), morale: Number(morale), garrison: "" }));
+  });
+
+  return armies;
+}
+
 // --- State ---
 const state = {
   phase: "setup", // setup | combat | ended
@@ -749,6 +799,7 @@ const state = {
   silverCoins: 0,
   vault: [],
   missionNotes: "",
+  armies: [],
   mobs: [],
   enemyIndex: 0,
   log: [],
@@ -1903,6 +1954,83 @@ function renderControls() {
       : "Resolve enemies in order. Choose who takes the hits.";
 }
 
+function renderArmies() {
+  const list = $("armyList");
+  if (!list) return;
+
+  state.armies = normalizeArmies(state.armies);
+
+  if (!state.armies.length) {
+    list.innerHTML = `<div class="lk-empty-sheet">No armies yet. Add one to get started.</div>`;
+    return;
+  }
+
+  const rows = state.armies.map((army, idx) => {
+    const options = [...GARRISON_OPTIONS];
+    const hasCustomGarrison = army.garrison && !options.some(opt => opt.value === army.garrison);
+    if (hasCustomGarrison) options.push({ value: army.garrison, label: army.garrison });
+    const garrisonOptions = options.map(opt => `
+      <option value="${escapeHtml(opt.value)}"${opt.value === army.garrison ? " selected" : ""}>${escapeHtml(opt.label)}</option>
+    `).join("");
+    const idBase = `army-${idx}`;
+
+    return `
+      <div class="lk-army-row${idx < state.armies.length - 1 ? " mb-2" : ""}">
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="${idBase}-name">Unit name</label>
+            <input type="text" class="form-control" id="${idBase}-name" data-army-field="name" data-army-index="${idx}" value="${escapeHtml(army.name)}" placeholder="Unit name">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label" for="${idBase}-strength">⚔️ Strength</label>
+            <input type="number" min="0" max="999" class="form-control" id="${idBase}-strength" data-army-field="strength" data-army-index="${idx}" value="${army.strength}">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label" for="${idBase}-morale">🙂 Morale</label>
+            <input type="number" min="0" max="999" class="form-control" id="${idBase}-morale" data-army-field="morale" data-army-index="${idx}" value="${army.morale}">
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label" for="${idBase}-garrison">🗺️ Garrison</label>
+            <select class="form-select" id="${idBase}-garrison" data-army-field="garrison" data-army-index="${idx}">${garrisonOptions}</select>
+          </div>
+          <div class="col-12 col-md-1 d-flex justify-content-md-end align-items-end">
+            <button type="button" class="btn btn-link btn-sm text-danger" data-army-remove="${idx}">Remove</button>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  list.innerHTML = rows.join("");
+}
+
+function onArmyFieldChange(target) {
+  const field = target.getAttribute("data-army-field");
+  const idx = Number(target.getAttribute("data-army-index"));
+  if (!field || Number.isNaN(idx)) return;
+
+  const army = state.armies[idx];
+  if (!army) return;
+
+  if (field === "name" || field === "garrison") {
+    army[field] = field === "garrison" ? normalizeGarrison(target.value) : target.value;
+  }
+
+  if (field === "strength" || field === "morale") {
+    army[field] = clampInt(target.value, 0, 999, army[field] || 0);
+    target.value = army[field];
+  }
+
+  saveSetupToStorage(state);
+}
+
+function removeArmyAt(idx) {
+  if (Number.isNaN(idx) || idx < 0 || idx >= state.armies.length) return;
+  state.armies.splice(idx, 1);
+  saveSetupToStorage(state);
+  renderArmies();
+}
+
 function renderCodes() {
   const tabArea = $("codeBookTabs");
   const gridArea = $("codeGrid");
@@ -2104,6 +2232,7 @@ function renderAll() {
   renderEditors();
   renderTables();
   renderControls();
+  renderArmies();
   renderCodes();
   renderSkillCheck();
   renderLatestRoll();
@@ -2515,6 +2644,41 @@ function initUI() {
   });
   $("skillRoll").addEventListener("click", performSkillRoll);
 
+  // Armies
+  $("addArmy").addEventListener("click", () => {
+    state.armies.push(normalizeArmy({}));
+    saveSetupToStorage(state);
+    renderArmies();
+  });
+  $("importArmies").addEventListener("click", () => {
+    $("armyImportError").style.display = "none";
+    $("armyImportError").textContent = "";
+    $("armyImportText").value = "";
+    bsModalShow("armyImportDialog");
+  });
+  $("armyImportCancel").addEventListener("click", () => bsModalHide("armyImportDialog"));
+  $("armyImportOk").addEventListener("click", () => {
+    try {
+      const armies = parseArmiesImport($("armyImportText").value || "");
+      state.armies = armies;
+      saveSetupToStorage(state);
+      bsModalHide("armyImportDialog");
+      renderArmies();
+    } catch (e) {
+      $("armyImportError").textContent = String(e?.message || e);
+      $("armyImportError").style.display = "";
+    }
+  });
+  const armyList = $("armyList");
+  if (armyList) {
+    armyList.addEventListener("input", (e) => onArmyFieldChange(e.target));
+    armyList.addEventListener("change", (e) => onArmyFieldChange(e.target));
+    armyList.addEventListener("click", (e) => {
+      const idx = Number(e.target.getAttribute("data-army-remove"));
+      if (!Number.isNaN(idx)) removeArmyAt(idx);
+    });
+  }
+
   $("addMember").addEventListener("click", openHeroDialog);
   $("clearParty").addEventListener("click", () => {
     if (!confirm("Clear party setup and saved data?")) return;
@@ -2627,6 +2791,7 @@ function initState() {
   state.codes = normalizeCodes(state.codes);
   state.selectedCodeBook = normalizeBookKey(state.selectedCodeBook);
   state.skillCheck = normalizeSkillCheck(state.skillCheck);
+  state.armies = normalizeArmies(state.armies);
   if (!loaded) {
     const randomHero = HERO_NAMES[Math.floor(Math.random() * HERO_NAMES.length)];
     state.party = [ newMember(randomHero) ];
@@ -2636,6 +2801,7 @@ function initState() {
     state.codes = createEmptyCodes();
     state.selectedCodeBook = CODE_BOOKS[0]?.key || "A";
     state.skillCheck = normalizeSkillCheck(DEFAULT_SKILL_CHECK);
+    state.armies = [];
     saveSetupToStorage(state);
   }
 }
