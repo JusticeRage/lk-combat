@@ -288,14 +288,6 @@
   flex-direction: column;
 }
 
-.lk-silver-card {
-  border: 1px dashed var(--bs-border-color);
-  border-radius: .9rem;
-  padding: .75rem .9rem;
-  background: color-mix(in oklab, var(--bs-body-bg) 70%, var(--bs-tertiary-bg) 30%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
-}
-
 .lk-vault-input { min-width: 260px; }
 
 .lk-vault-list {
@@ -305,8 +297,13 @@
   display: flex;
   flex-direction: column;
   gap: .5rem;
-  background: var(--bs-body-bg);
+  background: color-mix(
+    in oklab,
+    var(--bs-body-bg) 70%,
+    var(--bs-tertiary-bg) 30%
+  );
 }
+
 
 .lk-vault-item {
   display: grid;
@@ -491,4 +488,42 @@
 
 .lk-dialog::backdrop {
   background: rgba(15, 23, 42, .55);
+}
+
+.lk-shared-section {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+
+.lk-shared-section--notes {
+  flex: 1;
+  min-height: 0;
+}
+
+.lk-shared-section--notes .lk-mission-notes {
+  flex: 1;
+  min-height: 240px;
+  resize: none;
+}
+
+.lk-shared-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  flex-wrap: wrap;
+  margin-bottom: .25rem;
+}
+
+.lk-shared-mini {
+  border: 1px solid var(--bs-border-color);
+  border-radius: .85rem;
+  padding: .75rem .9rem;
+  background: var(--bs-body-bg);
+  box-shadow: var(--lk-shadow-sm);
+}
+
+.lk-mission-notes {
+  min-height: 240px;
 }

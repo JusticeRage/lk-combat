@@ -270,26 +270,34 @@ Successes Required: 4"></textarea>
           </div>
           <div class="card-body">
             <div class="lk-shared-layout">
-              <div class="lk-vault-panel">
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                  <div>
+            <section class="lk-section lk-shared-section">
+                <div class="lk-shared-head">
+                <div>
                     <h3 class="h6 mb-0">The Vault</h3>
-                    <div class="text-body-secondary small">Store any number of shared items.</div>
-                  </div>
-                  <div class="input-group input-group-sm lk-vault-input">
-                    <input type="text" id="vaultInput" class="form-control" placeholder="Add item to the vault" aria-label="Add item to the vault">
-                    <button class="btn btn-primary" type="button" id="vaultAdd">Add</button>
-                  </div>
+                    <div class="text-body-secondary small">Store any number of items.</div>
                 </div>
-                <div id="vaultList" class="lk-vault-list"></div>
-              </div>
+                <div class="input-group input-group-sm lk-vault-input">
+                    <input type="text" id="vaultInput" class="form-control" placeholder="Add item to the vault">
+                    <button class="btn btn-primary" type="button" id="vaultAdd">Add</button>
+                </div>
+                </div>
 
-              <div class="lk-mission-panel">
+                <div id="vaultList" class="lk-vault-list"></div>
+            </section>
+
+            <section class="lk-section lk-shared-section lk-shared-section--notes">
                 <div id="partySilver" class="mb-3"></div>
-                <label class="form-label" for="missionNotes">Mission notes</label>
-                <textarea id="missionNotes" class="form-control lk-mission-notes" rows="10" spellcheck="false" placeholder="Party-wide notes"></textarea>
-                <div class="text-body-secondary small mt-2">Saved with this party.</div>
-              </div>
+
+                <div class="lk-shared-head">
+                <div>
+                    <h3 class="h6 mb-0">Mission notes</h3>
+                    <div class="text-body-secondary small">Party-wide notes</div>
+                </div>
+                </div>
+
+                <textarea id="missionNotes" class="form-control lk-mission-notes" rows="10" spellcheck="false"
+                placeholder="Party-wide notes"></textarea>
+            </section>
             </div>
           </div>
         </div>

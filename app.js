@@ -1636,21 +1636,23 @@ function renderEditors() {
     if (!holder) return;
 
     holder.innerHTML = `
-      <div class="lk-silver-card">
-        <div class="d-flex align-items-center justify-content-between gap-2">
+      <div class="lk-shared-mini">
+      <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
           <div>
-            <p class="text-uppercase small text-secondary fw-semibold mb-1">Party silver</p>
-            <div class="text-secondary small">Shared pool</div>
+          <p class="text-uppercase small text-secondary fw-semibold mb-1">👛  Party silver</p>
           </div>
-          <div class="input-group input-group-sm">
-            <span class="input-group-text">Coins</span>
-            <input type="number" class="form-control" min="0" max="999999" data-k="silverCoins" value="${state.silverCoins || 0}" aria-label="Party silver coins">
+          <div class="input-group input-group-sm" style="max-width: 240px;">
+          <span class="input-group-text">Silver coins</span>
+          <input type="number" class="form-control" min="0" max="999999"
+              data-k="silverCoins" value="${state.silverCoins || 0}" aria-label="Party silver coins">
           </div>
-        </div>
+      </div>
       </div>
     `;
 
-    holder.querySelectorAll('[data-k="silverCoins"]').forEach(el => el.addEventListener("change", onPartyEdit));
+    holder.querySelectorAll('[data-k="silverCoins"]').forEach(el =>
+      el.addEventListener("change", onPartyEdit)
+    );
   }
 
   function renderMissionNotes() {
