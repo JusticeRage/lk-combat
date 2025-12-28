@@ -1541,8 +1541,7 @@ function renderCodes() {
 
   tabArea.innerHTML = CODE_BOOKS.map(book => `
     <button type="button" class="lk-code-tab${book.key === activeKey ? " is-active" : ""}" data-code-book="${book.key}" aria-pressed="${book.key === activeKey ? "true" : "false"}">
-      <p class="lk-code-tab__title mb-0">${escapeHtml(book.title)}</p>
-      <p class="lk-code-tab__subtitle mb-0">${escapeHtml(book.key)}1–${escapeHtml(book.key)}100</p>
+      <p class="lk-code-tab__title mb-0">${escapeHtml(`${book.title} (${book.key})`)}</p>
     </button>
   `).join("");
 
