@@ -61,3 +61,113 @@
 @media (max-width: 575.98px) {
   .lk-log { height: 360px; }
 }
+
+/* -----------------------------
+   Party management: card grid
+-------------------------------- */
+
+.lk-party-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+/* Treat each direct child as a "character card" */
+#partyEditor.lk-party-grid > *{
+  border: 1px solid var(--lk-border);
+  border-radius: var(--lk-radius);
+  background: var(--bs-body-bg);
+  box-shadow: var(--lk-shadow-sm);
+  overflow: clip;
+  padding: 1rem;
+}
+
+/* Headings inside a character card */
+#partyEditor.lk-party-grid > * :is(h1,h2,h3,h4,h5){
+  margin: 0 0 .75rem 0;
+  line-height: 1.2;
+}
+
+/* Reduce random spacing patterns from legacy markup */
+#partyEditor.lk-party-grid > * :is(.row, .form-group, .input-group, .btn-group){
+  margin-top: 0;
+}
+
+/* Normalize grid gutters if JS uses .row/.col-* patterns */
+#partyEditor.lk-party-grid .row{
+  --bs-gutter-x: .75rem;
+  --bs-gutter-y: .75rem;
+}
+
+/* Make labels look consistent and “sheet-like” */
+#partyEditor.lk-party-grid label{
+  font-size: .75rem;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+  margin-bottom: .25rem;
+}
+
+/* Inputs/selects: consistent sizing */
+#partyEditor.lk-party-grid :is(input[type="text"], input[type="number"], select, textarea){
+  border-radius: .7rem;
+}
+
+/* “Section” styling for common block containers (stats/inventory/etc.) */
+#partyEditor.lk-party-grid :is(
+  .stats, .statblock, .character-stats,
+  .inventory, .inv, .equipment,
+  [class*="stats"], [class*="inventory"],
+  [id*="stats"], [id*="inventory"]
+){
+  margin-top: .85rem;
+  padding-top: .85rem;
+  border-top: 1px dashed color-mix(in oklab, var(--bs-border-color) 60%, transparent);
+}
+
+/* Inventory buttons: flow nicely instead of looking scattered */
+#partyEditor.lk-party-grid :is(
+  .inventory, .inv, .equipment,
+  [class*="inventory"], [id*="inventory"]
+){
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  align-items: center;
+}
+
+/* Any obvious "button rows" align cleanly */
+#partyEditor.lk-party-grid .text-right,
+#partyEditor.lk-party-grid .actions,
+#partyEditor.lk-party-grid [class*="actions"],
+#partyEditor.lk-party-grid [class*="controls"]{
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+/* Small buttons look more intentional */
+#partyEditor.lk-party-grid .btn{
+  border-radius: .8rem;
+}
+
+/* If JS outputs tables inside a character card, keep them compact */
+#partyEditor.lk-party-grid table{
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--lk-border);
+  border-radius: var(--lk-radius-sm);
+  overflow: hidden;
+  margin-top: .75rem;
+}
+#partyEditor.lk-party-grid th,
+#partyEditor.lk-party-grid td{
+  padding: .45rem .55rem;
+  border-bottom: 1px solid var(--lk-border);
+  vertical-align: middle;
+}
+#partyEditor.lk-party-grid tr:last-child td{ border-bottom: none; }
