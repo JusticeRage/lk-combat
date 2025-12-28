@@ -200,7 +200,9 @@ function normalizeEquipmentEntry(raw) {
   const base = matchItem(raw.id || raw.name || raw.custom);
   const item = getItemById(base.id);
   let equipped = (raw.equipped === null || raw.equipped === undefined) ? null : !!raw.equipped;
-  if (equipped === null) equipped = item?.type === "weapon" ? true : false;
+  if (equipped === null) {
+    equipped = item?.type === "weapon" ? true : false;
+  }
   return {
     id: base.id,
     custom: typeof raw.custom === "string" ? raw.custom : base.custom,
@@ -235,7 +237,8 @@ function getEquipmentModifiers(member) {
     const entry = normalizeEquipmentEntry(raw);
     const item = getEquipmentItem(entry);
     if (!item) continue;
-    if (item.type === "weapon" && !entry.equipped) continue;
+    const requiresEquipped = item.type === "weapon" || !!item.hands;
+    if (requiresEquipped && !entry.equipped) continue;
     const stack = item.countable ? Math.max(1, entry.count || 1) : 1;
     for (const [k, v] of Object.entries(item.modifiers || {})) {
       mods[k] = (mods[k] || 0) + (Number(v) || 0) * stack;
@@ -250,7 +253,8 @@ function enforceWeaponHandLimit(member) {
   member.equipment = member.equipment.map(raw => {
     const entry = normalizeEquipmentEntry(raw);
     const item = getEquipmentItem(entry);
-    if (item?.type === "weapon") {
+    const requiresHands = item?.hands && (item.type === "weapon" || entry.equipped);
+    if (requiresHands) {
       const hands = item.hands === 2 ? 2 : 1;
       if (entry.equipped && handsUsed + hands > 2) {
         entry.equipped = false;
@@ -368,7 +372,7 @@ function describeItem(item, entry) {
   }
   if (item.hands) details.push(item.hands === 2 ? "Two-handed" : "One-handed");
   if (item.type === "weapon") details.push("Weapon");
-  if (item.type === "weapon") details.push(entry?.equipped ? "Equipped" : "Unequipped");
+  if (item.type === "weapon" || item.hands) details.push(entry?.equipped ? "Equipped" : "Unequipped");
   if (item.countable) details.push(`Count: ${entry?.count || 1}`);
   return details.join(" • ");
 }
@@ -977,6 +981,7 @@ function renderEditors() {
       const eq = normalizeEquipmentEntry(eqRaw);
       const item = getEquipmentItem(eq);
       const isWeapon = item?.type === "weapon";
+      const requiresEquipped = isWeapon || !!item?.hands;
       const itemLabel = escapeHtml(item?.name || eq.custom || "");
       const detailText = item ? describeItem(item, eq) : (eq.custom ? "Custom item" : "No item");
       const spells = Array.isArray(eq.spells) ? eq.spells.filter(Boolean) : [];
@@ -1013,7 +1018,7 @@ function renderEditors() {
             </div>
           </td>
           <td class="text-center">
-            ${isWeapon ? `
+            ${requiresEquipped ? `
               <div class="form-check form-switch lk-equip-switch">
                 <input class="form-check-input" type="checkbox" data-k="equipment" data-field="equipped" data-ei="${slot}" data-i="${state.selectedPartyIndex}" ${eq.equipped ? "checked" : ""} id="${equippedId}">
                 <label class="form-check-label" for="${equippedId}">Equipped</label>
