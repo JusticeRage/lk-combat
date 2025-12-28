@@ -35,6 +35,15 @@ const SPELL_SLOTS = 6;
 
 const LS_KEY = "lk_combat_tracker_v3";
 
+const CODE_BOOKS = [
+  { key: "A", title: "The Valley of Bones" },
+  { key: "B", title: "Crown and Tower" },
+  { key: "C", title: "Pirates of the Splintered Isles" },
+  { key: "D", title: "The Gilded Throne" },
+  { key: "E", title: "The Savage Lands" },
+  { key: "F", title: "Drakehallow" },
+];
+
 const STAT_LABELS = {
   fighting: "Fighting",
   stealth: "Stealth",
@@ -183,6 +192,23 @@ function escapeHtml(s) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+const createEmptyCodes = () => Object.fromEntries(CODE_BOOKS.map(book => [book.key, Array(100).fill(false)]));
+
+function normalizeCodes(raw) {
+  const base = createEmptyCodes();
+  if (!raw || typeof raw !== "object") return base;
+  for (const book of CODE_BOOKS) {
+    const arr = Array.isArray(raw[book.key]) ? raw[book.key] : [];
+    base[book.key] = Array.from({ length: 100 }, (_, idx) => Boolean(arr[idx]));
+  }
+  return base;
+}
+
+function normalizeBookKey(key) {
+  const exists = CODE_BOOKS.some(book => book.key === key);
+  return exists ? key : (CODE_BOOKS[0]?.key || "A");
 }
 
 function matchItem(text) {
@@ -378,6 +404,8 @@ function describeItem(item, entry) {
 }
 
 function saveSetupToStorage(state) {
+  state.codes = normalizeCodes(state.codes);
+  state.selectedCodeBook = normalizeBookKey(state.selectedCodeBook);
   const payload = {
     silverCoins: state.silverCoins || 0,
     party: state.party.map(p => ({
@@ -397,7 +425,9 @@ function saveSetupToStorage(state) {
     mobs: state.mobs.map(m => ({
       name: m.name, atkDice: m.atkDice, atkTarget: m.atkTarget, auto: m.auto,
       defTarget: m.defTarget, health: m.health, maxHealth: m.maxHealth
-    }))
+    })),
+    codes: state.codes,
+    selectedCodeBook: state.selectedCodeBook,
   };
   try { localStorage.setItem(LS_KEY, JSON.stringify(payload)); } catch {}
 }
@@ -408,6 +438,9 @@ function loadSetupFromStorage(state) {
     if (!raw) return false;
     const obj = JSON.parse(raw);
     if (!obj || typeof obj !== "object") return false;
+
+    state.codes = normalizeCodes(obj.codes);
+    state.selectedCodeBook = normalizeBookKey(obj.selectedCodeBook);
 
     state.silverCoins = clampInt(obj.silverCoins, 0, 999999, 0);
 
@@ -540,6 +573,8 @@ const state = {
   history: [],
   battleSeed: null,   // snapshot for restart
   selectedPartyIndex: 0,
+  codes: createEmptyCodes(),
+  selectedCodeBook: CODE_BOOKS[0]?.key || "A",
 };
 
 function pushLog(line) {
@@ -1495,10 +1530,63 @@ function renderControls() {
       : "Resolve enemies in order. Choose who takes the hits.";
 }
 
+function renderCodes() {
+  const tabArea = $("codeBookTabs");
+  const gridArea = $("codeGrid");
+  if (!tabArea || !gridArea) return;
+
+  state.codes = normalizeCodes(state.codes);
+  state.selectedCodeBook = normalizeBookKey(state.selectedCodeBook);
+  const activeKey = state.selectedCodeBook;
+
+  tabArea.innerHTML = CODE_BOOKS.map(book => `
+    <button type="button" class="lk-code-tab${book.key === activeKey ? " is-active" : ""}" data-code-book="${book.key}" aria-pressed="${book.key === activeKey ? "true" : "false"}">
+      <p class="lk-code-tab__title mb-0">${escapeHtml(book.title)}</p>
+      <p class="lk-code-tab__subtitle mb-0">${escapeHtml(book.key)}1–${escapeHtml(book.key)}100</p>
+    </button>
+  `).join("");
+
+  const codes = state.codes[activeKey] || [];
+  const cells = [];
+  for (let row = 0; row < 10; row++) {
+    for (let col = 0; col < 10; col++) {
+      const num = row + 1 + (col * 10);
+      const idx = num - 1;
+      const codeId = `${activeKey}${num}`;
+      cells.push(`
+        <label class="lk-code-cell form-check mb-0" for="code-${codeId}">
+          <input class="form-check-input" type="checkbox" id="code-${codeId}" data-code-book="${activeKey}" data-code-index="${idx}" ${codes[idx] ? "checked" : ""}>
+          <span class="lk-code-label">${escapeHtml(codeId)}</span>
+        </label>
+      `);
+    }
+  }
+
+  gridArea.innerHTML = `<div class="lk-code-grid" role="grid">${cells.join("")}</div>`;
+
+  tabArea.querySelectorAll("[data-code-book]").forEach(btn => btn.addEventListener("click", () => {
+    state.selectedCodeBook = normalizeBookKey(btn.getAttribute("data-code-book"));
+    saveSetupToStorage(state);
+    renderCodes();
+  }));
+
+  gridArea.querySelectorAll("input[data-code-index]").forEach(input => input.addEventListener("change", onCodeToggle));
+}
+
+function onCodeToggle(e) {
+  const book = e.target.getAttribute("data-code-book");
+  const idx = Number(e.target.getAttribute("data-code-index"));
+  if (!book || Number.isNaN(idx) || idx < 0 || idx >= 100) return;
+  state.codes = normalizeCodes(state.codes);
+  state.codes[book][idx] = !!e.target.checked;
+  saveSetupToStorage(state);
+}
+
 function renderAll() {
   renderEditors();
   renderTables();
   renderControls();
+  renderCodes();
   renderLog();
 }
 
@@ -1931,11 +2019,16 @@ function initUI() {
 
 // --- Init ---
 function initState() {
-  if (!loadSetupFromStorage(state)) {
+  const loaded = loadSetupFromStorage(state);
+  state.codes = normalizeCodes(state.codes);
+  state.selectedCodeBook = normalizeBookKey(state.selectedCodeBook);
+  if (!loaded) {
     state.party = [ newMember("Akihiro of Chalice", { fighting: 4, armour: 0, health: 8, maxHealth: 8 }) ];
     state.selectedPartyIndex = 0;
     state.mobs = [ { name: "Goblin", atkDice: 4, atkTarget: 5, auto: 0, defTarget: 4, health: 6, maxHealth: 6, dead: false } ];
     state.silverCoins = 0;
+    state.codes = createEmptyCodes();
+    state.selectedCodeBook = CODE_BOOKS[0]?.key || "A";
     saveSetupToStorage(state);
   }
 }

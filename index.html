@@ -164,6 +164,12 @@
           Combat
         </button>
       </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="codesTabBtn" data-bs-toggle="tab" data-bs-target="#codesTab"
+                type="button" role="tab" aria-controls="codesTab" aria-selected="false">
+          Codes
+        </button>
+      </li>
     </ul>
 
     <div class="tab-content">
@@ -298,6 +304,20 @@
             </div>
           </div>
 
+        </div>
+      </section>
+
+      <!-- Codes -->
+      <section id="codesTab" class="tab-pane fade" role="tabpanel" aria-labelledby="codesTabBtn" tabindex="0">
+        <div class="card shadow-sm">
+          <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <h2 class="h5 mb-0">Codes</h2>
+            <div class="text-body-secondary small">Track book state flags (saved locally)</div>
+          </div>
+          <div class="card-body">
+            <div id="codeBookTabs" class="lk-code-tabs" role="tablist" aria-label="Code books"></div>
+            <div id="codeGrid" class="mt-3"></div>
+          </div>
         </div>
       </section>
     </div>
