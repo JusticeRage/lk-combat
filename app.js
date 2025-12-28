@@ -329,6 +329,23 @@ function renderHpBlock(entity) {
   `;
 }
 
+function renderPortraitHp(hero) {
+  const current = Math.max(0, hero?.health ?? 0);
+  const max = Math.max(1, hero?.maxHealth ?? 1);
+  const pct = Math.min(100, Math.max(0, (current / max) * 100));
+  return `
+    <div class="lk-portrait-hp" aria-label="Hit points">
+      <div class="lk-portrait-hp-head">
+        <span class="lk-portrait-hp-title">HP</span>
+        <span class="lk-portrait-hp-num">${current}/${max}</span>
+      </div>
+      <div class="progress" role="progressbar" aria-valuenow="${current}" aria-valuemin="0" aria-valuemax="${max}">
+        <div class="progress-bar" style="width:${pct}%"></div>
+      </div>
+    </div>
+  `;
+}
+
 function renderStatGrid(hero) {
   const stats = computeDisplayedStats(hero);
   const order = ["fighting", "armour", "stealth", "lore", "survival", "charisma"];
@@ -902,7 +919,7 @@ function renderEditors() {
   partyMeta.className = "lk-party-resources";
   partyMeta.innerHTML = `
     <div class="lk-resource-card">
-      <div class="lk-resource-icon" aria-hidden="true">🪙</div>
+      <div class="lk-resource-icon" aria-hidden="true">👛</div>
       <div class="flex-grow-1">
         <div class="d-flex align-items-center justify-content-between gap-2">
           <div class="text-uppercase small text-secondary fw-semibold">Party silver</div>
@@ -926,8 +943,6 @@ function renderEditors() {
   rail.className = "lk-portrait-rail";
 
   state.party.forEach((p, idx) => {
-    const stats = computeDisplayedStats(p);
-    const hpText = `${Math.max(0, p.health)}/${p.maxHealth} HP`;
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `lk-portrait-tab${idx === state.selectedPartyIndex ? " is-active" : ""}`;
@@ -937,7 +952,7 @@ function renderEditors() {
       <img src="${getHeroImage(p.name)}" alt="${escapeHtml(p.name)} portrait" class="lk-portrait-thumb">
       <div class="text-start">
         <p class="lk-portrait-name mb-1">${escapeHtml(p.name)}</p>
-        <div class="lk-portrait-meta">${escapeHtml(formatStatBadge("fighting", stats.fighting))} • HP ${hpText}</div>
+        ${renderPortraitHp(p)}
       </div>
     `;
     rail.appendChild(btn);
@@ -1052,10 +1067,8 @@ function renderEditors() {
       }
     }
 
-    const notesSectionClass = isCaster ? "lk-section lk-section--wide" : "lk-section";
-
     const notesSection = `
-      <div class="${notesSectionClass}">
+      <div class="lk-section">
         <div class="lk-section-heading">
           <p class="lk-section-title mb-0">Notes</p>
           <span class="text-secondary small">Reminders for this hero</span>
@@ -1065,7 +1078,7 @@ function renderEditors() {
     `;
 
     const spellsSection = isCaster ? `
-      <div class="lk-section">
+      <div class="lk-section lk-section--wide">
         <div class="lk-section-heading">
           <p class="lk-section-title mb-0">Spells</p>
           <span class="text-secondary small">${spellRows.length} slots</span>
@@ -1116,9 +1129,9 @@ function renderEditors() {
             </div>
             ${equipmentMeta}
           </div>
-          ${spellsSection}
           ${notesSection}
         </div>
+        ${spellsSection}
       </div>
     `;
 
