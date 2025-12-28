@@ -15,9 +15,8 @@
 
     <!-- Header -->
     <header class="lk-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
-      <div class="text-center text-md-start">
-        <h1 class="h3 mb-1">Legendary Kingdoms — Combat Tracker</h1>
-        <p class="text-body-secondary mb-0">Party attacks first. Each hero may act once per round. Spells are once per battle.</p>
+      <div class="lk-logo-wrap text-center text-md-start">
+        <img src="./img/logo.webp" class="lk-logo" alt="Legendary Kingdoms — Combat Tracker">
       </div>
 
       <div class="d-flex justify-content-center justify-content-md-end gap-2">
@@ -470,11 +469,13 @@ Successes Required: 4"></textarea>
     (() => {
       const root = document.documentElement;
       const btn = document.getElementById('themeToggle');
+      const label = btn?.querySelector('.lk-theme-text');
 
       function apply(theme) {
         root.setAttribute('data-bs-theme', theme);
         try { localStorage.setItem('lk-theme', theme); } catch(e) {}
         btn?.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+        if (label) label.textContent = `Theme: ${theme}`;
       }
 
       function init() {

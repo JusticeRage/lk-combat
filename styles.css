@@ -7,6 +7,16 @@
     linear-gradient(180deg, var(--bs-body-bg), var(--bs-body-bg));
 }
 
+.lk-logo-wrap {
+  max-width: 380px;
+}
+
+.lk-logo {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
 .lk-stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

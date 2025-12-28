@@ -1721,11 +1721,13 @@ function renderControls() {
     livingMobs().length > 0;
 
   const selectedAttacker = state.party[Number(pa.value)];
+  const selectedIsCaster = !!selectedAttacker && isSpellcaster(selectedAttacker.name);
   const canCastSelected = partyTurn && !!selectedAttacker &&
     !selectedAttacker.dead && selectedAttacker.health > 0 && !selectedAttacker.actedThisRound &&
-    isSpellcaster(selectedAttacker.name) && livingMobs().length > 0;
+    selectedIsCaster && livingMobs().length > 0;
 
   $("playerAttack").disabled = !canPartyAct;
+  $("playerSpell").style.display = selectedIsCaster ? "" : "none";
   $("playerSpell").disabled = !canCastSelected;
   $("playerSkip").disabled = !partyTurn;
 
