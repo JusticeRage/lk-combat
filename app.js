@@ -57,19 +57,38 @@ const $ = (id) => document.getElementById(id);
 
 function bsModalShow(id) {
   const el = $(id);
-  if (!el || typeof bootstrap === "undefined" || !bootstrap.Modal) return;
-  bootstrap.Modal.getOrCreateInstance(el).show();
+  if (!el) return;
+  const isBootstrapModal = el.classList?.contains("modal");
+  if (isBootstrapModal && typeof bootstrap !== "undefined" && bootstrap.Modal) {
+    bootstrap.Modal.getOrCreateInstance(el).show();
+    return;
+  }
+  if (typeof el.showModal === "function") {
+    el.showModal();
+    return;
+  }
+  el.style.display = "";
 }
 
 function bsModalHide(id) {
   const el = $(id);
-  if (!el || typeof bootstrap === "undefined" || !bootstrap.Modal) return;
-  (bootstrap.Modal.getInstance(el) || bootstrap.Modal.getOrCreateInstance(el)).hide();
+  if (!el) return;
+  const isBootstrapModal = el.classList?.contains("modal");
+  if (isBootstrapModal && typeof bootstrap !== "undefined" && bootstrap.Modal) {
+    (bootstrap.Modal.getInstance(el) || bootstrap.Modal.getOrCreateInstance(el)).hide();
+    return;
+  }
+  if (typeof el.close === "function") {
+    el.close();
+    return;
+  }
+  el.style.display = "none";
 }
 
 // Ensure stats modal exists even if HTML doesn't include it (for Bootstrap-only UI)
 function ensureStatsModalExists() {
-  if ($("statsDialog")) return;
+  const existing = $("statsDialog");
+  if (existing) return;
   const wrap = document.createElement("div");
   wrap.innerHTML = `
   <div class="modal fade" id="statsDialog" tabindex="-1" aria-hidden="true">
@@ -827,13 +846,19 @@ function renderEditors() {
   itemList.innerHTML = ITEMS.map(it => `<option value="${escapeHtml(it.name)}"></option>`).join("");
 
   const partyMeta = document.createElement("div");
-  partyMeta.className = "panel panel-default hero-card";
+  partyMeta.className = "lk-party-resources";
   partyMeta.innerHTML = `
-    <div class="panel-body">
-      <div class="row">
-        <label>Silver coins
-          <input type="number" class="form-control input-sm" min="0" max="999999" data-k="silverCoins" value="${state.silverCoins || 0}">
-        </label>
+    <div class="lk-resource-card">
+      <div class="lk-resource-icon" aria-hidden="true">🪙</div>
+      <div class="flex-grow-1">
+        <div class="d-flex align-items-center justify-content-between gap-2">
+          <div class="text-uppercase small text-secondary fw-semibold">Party silver</div>
+          <div class="text-secondary small">Shared pool</div>
+        </div>
+        <div class="input-group input-group-sm mt-2">
+          <span class="input-group-text">Coins</span>
+          <input type="number" class="form-control" min="0" max="999999" data-k="silverCoins" value="${state.silverCoins || 0}">
+        </div>
       </div>
     </div>
   `;
@@ -928,11 +953,8 @@ function renderEditors() {
           <div style="flex:1;">
             <div class="row hero-top-row">
               <div class="col-sm-6">
-                <label>Name
-                  <select data-k="name" data-i="${idx}" class="form-control input-sm">
-                    ${HERO_NAMES.map(n => `<option value="${escapeHtml(n)}" ${p.name===n ? "selected":""}>${escapeHtml(n)}</option>`).join("")}
-                  </select>
-                </label>
+                <label class="form-label">Name</label>
+                <div class="form-control form-control-sm bg-body-secondary hero-name" aria-label="Character name">${escapeHtml(p.name)}</div>
               </div>
               <div class="col-sm-6">
                 <div class="d-flex justify-content-end gap-2 flex-wrap">
@@ -953,7 +975,15 @@ function renderEditors() {
             <textarea data-k="notes" data-i="${idx}" spellcheck="false" class="form-control">${escapeHtml(p.notes || "")}</textarea>
           </label>
         </div>
-        ${isSpellcaster(p.name) ? `<div class="panel panel-default spell-card" style="margin-top:10px;"><div class="panel-body">${spellRows.join("")}</div></div>` : ""}
+        ${isSpellcaster(p.name) ? `
+          <details class="spell-card">
+            <summary>
+              <span>Spells</span>
+              <span class="spell-count text-secondary small">${spellRows.length} slots</span>
+            </summary>
+            <div class="spell-body">${spellRows.join("")}</div>
+          </details>
+        ` : ""}
       </div>
     `;
     pe.appendChild(div);
@@ -1057,7 +1087,6 @@ function onPartyEdit(e) {
   p.equipment = normalizeEquipmentList(p.equipment, { keepEmpty: true });
   if (!Array.isArray(p.spells)) p.spells = Array.from({ length: SPELL_SLOTS }, () => ({ id: "", status: "ready" }));
 
-  if (k === "name") p.name = el.value || HERO_NAMES[0];
   if (k === "fighting") p.fighting = clampInt(el.value, 0, 50, p.fighting);
   if (k === "stealth") p.stealth = clampInt(el.value, 0, 50, p.stealth);
   if (k === "lore") p.lore = clampInt(el.value, 0, 50, p.lore);
