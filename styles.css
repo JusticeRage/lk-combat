@@ -119,37 +119,6 @@
   padding: .5rem .6rem;
 }
 
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: .35rem;
-  padding: .4rem .75rem;
-  border-radius: 999px;
-  border: 1px solid var(--bs-border-color);
-  background: color-mix(in oklab, var(--bs-tertiary-bg) 70%, transparent);
-  font-weight: 700;
-  letter-spacing: .01em;
-  box-shadow: 0 .25rem .75rem rgba(0,0,0,.04);
-}
-
-.stat-pill {
-  background: color-mix(in oklab, var(--bs-primary-bg-subtle) 55%, transparent);
-  border-color: color-mix(in oklab, var(--bs-primary-border-subtle) 60%, transparent);
-}
-
-.stat-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .35rem;
-  margin-top: .35rem;
-}
-
-/* JS-rendered editor cards should have consistent spacing */
-.lk-editor > .card,
-.lk-editor > div.card {
-  margin-bottom: .75rem;
-}
-
 /* Log area */
 .lk-log {
   height: 520px;
@@ -200,14 +169,6 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
 }
-
-.lk-hint {
-  padding: .75rem;
-  border-radius: .75rem;
-  border: 1px dashed var(--bs-border-color);
-  background: var(--bs-tertiary-bg);
-}
-
 
 .lk-code-layout {
   display: grid;
@@ -274,12 +235,6 @@
 }
 
 .lk-code-label { font-variant-numeric: tabular-nums; }
-
-/* Smaller pills */
-.nav-pills-sm .nav-link {
-  padding: .35rem .6rem;
-  font-size: .875rem;
-}
 
 /* Slightly sharper cards */
 .card { border-radius: 1rem; }
@@ -386,40 +341,6 @@
   grid-template-columns: minmax(220px, 260px) 1fr;
   gap: 1rem;
   align-items: start;
-}
-
-.lk-party-resources {
-  display: flex;
-  align-items: stretch;
-  border: 1px solid var(--lk-border);
-  border-radius: 1rem;
-  background: var(--bs-body-bg);
-  box-shadow: var(--lk-shadow-sm);
-  padding: 1rem;
-}
-
-.lk-resource-card {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  border: 1px dashed var(--bs-border-color);
-  border-radius: .9rem;
-  padding: 1rem;
-  flex: 1;
-  background: color-mix(in oklab, var(--bs-body-bg) 70%, var(--bs-tertiary-bg) 30%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
-}
-
-.lk-resource-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: .85rem;
-  display: grid;
-  place-items: center;
-  background: color-mix(in oklab, var(--bs-warning-bg-subtle) 60%, transparent);
-  border: 1px solid color-mix(in oklab, var(--bs-warning-border-subtle) 60%, transparent);
-  font-size: 1.4rem;
-  box-shadow: 0 .35rem .85rem rgba(0,0,0,.06);
 }
 
 .lk-portrait-rail {
