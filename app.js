@@ -355,6 +355,7 @@ function renderHpBlock(entity) {
   const current = Math.max(0, entity?.health ?? 0);
   const max = Math.max(1, entity?.maxHealth ?? 1);
   const pct = Math.min(100, Math.max(0, (current / max) * 100));
+  const hpClass = getHpBarClass(pct);
   return `
     <div class="lk-hp" aria-label="Hit points">
       <div class="lk-hp-head">
@@ -362,7 +363,7 @@ function renderHpBlock(entity) {
         <span class="lk-hp-num">${current}/${max}</span>
       </div>
       <div class="progress" role="progressbar" aria-valuenow="${current}" aria-valuemin="0" aria-valuemax="${max}">
-        <div class="progress-bar" style="width:${pct}%"></div>
+        <div class="progress-bar${hpClass ? ` ${hpClass}` : ""}" style="width:${pct}%"></div>
       </div>
     </div>
   `;
@@ -372,6 +373,7 @@ function renderPortraitHp(hero) {
   const current = Math.max(0, hero?.health ?? 0);
   const max = Math.max(1, hero?.maxHealth ?? 1);
   const pct = Math.min(100, Math.max(0, (current / max) * 100));
+  const hpClass = getHpBarClass(pct);
   return `
     <div class="lk-portrait-hp" aria-label="Hit points">
       <div class="lk-portrait-hp-head">
@@ -379,10 +381,16 @@ function renderPortraitHp(hero) {
         <span class="lk-portrait-hp-num">${current}/${max}</span>
       </div>
       <div class="progress" role="progressbar" aria-valuenow="${current}" aria-valuemin="0" aria-valuemax="${max}">
-        <div class="progress-bar" style="width:${pct}%"></div>
+        <div class="progress-bar${hpClass ? ` ${hpClass}` : ""}" style="width:${pct}%"></div>
       </div>
     </div>
   `;
+}
+
+function getHpBarClass(pct) {
+  if (pct < 25) return "bg-danger";
+  if (pct < 50) return "bg-warning";
+  return "";
 }
 
 function renderStatGrid(hero) {
