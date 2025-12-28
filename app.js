@@ -44,14 +44,15 @@ const EQUIPMENT_SLOTS = 10;
 const SPELL_SLOTS = 6;
 
 const LS_KEY = "lk_combat_tracker_v3";
+const DEFAULT_CODES_PER_BOOK = 100;
 
 const CODE_BOOKS = [
-  { key: "A", title: "The Valley of Bones" },
-  { key: "B", title: "Crown and Tower" },
-  { key: "C", title: "Pirates of the Splintered Isles" },
-  { key: "D", title: "The Gilded Throne" },
-  { key: "E", title: "The Savage Lands" },
-  { key: "F", title: "Drakehallow" },
+  { key: "A", title: "The Valley of Bones", length: DEFAULT_CODES_PER_BOOK },
+  { key: "B", title: "Crown and Tower", length: 110 },
+  { key: "C", title: "Pirates of the Splintered Isles", length: DEFAULT_CODES_PER_BOOK },
+  { key: "D", title: "The Gilded Throne", length: DEFAULT_CODES_PER_BOOK },
+  { key: "E", title: "The Savage Lands", length: DEFAULT_CODES_PER_BOOK },
+  { key: "F", title: "Drakehallow", length: DEFAULT_CODES_PER_BOOK },
 ];
 
 const STAT_LABELS = {
@@ -296,14 +297,21 @@ function escapeHtml(s) {
     .replaceAll('"', "&quot;");
 }
 
-const createEmptyCodes = () => Object.fromEntries(CODE_BOOKS.map(book => [book.key, Array(100).fill(false)]));
+const codesLengthForBook = (bookOrKey) => {
+  const key = typeof bookOrKey === "string" ? bookOrKey : bookOrKey?.key;
+  const book = CODE_BOOKS.find(b => b.key === key);
+  return book?.length || DEFAULT_CODES_PER_BOOK;
+};
+
+const createEmptyCodes = () => Object.fromEntries(CODE_BOOKS.map(book => [book.key, Array(codesLengthForBook(book)).fill(false)]));
 
 function normalizeCodes(raw) {
   const base = createEmptyCodes();
   if (!raw || typeof raw !== "object") return base;
   for (const book of CODE_BOOKS) {
     const arr = Array.isArray(raw[book.key]) ? raw[book.key] : [];
-    base[book.key] = Array.from({ length: 100 }, (_, idx) => Boolean(arr[idx]));
+    const len = codesLengthForBook(book);
+    base[book.key] = Array.from({ length: len }, (_, idx) => Boolean(arr[idx]));
   }
   return base;
 }
@@ -1216,25 +1224,6 @@ function renderEditors() {
   }
   itemList.innerHTML = ITEMS.map(it => `<option value="${escapeHtml(it.name)}"></option>`).join("");
 
-  const partyMeta = document.createElement("div");
-  partyMeta.className = "lk-party-resources";
-  partyMeta.innerHTML = `
-    <div class="lk-resource-card">
-      <div class="lk-resource-icon" aria-hidden="true">👛</div>
-      <div class="flex-grow-1">
-        <div class="d-flex align-items-center justify-content-between gap-2">
-          <div class="text-uppercase small text-secondary fw-semibold">Party silver</div>
-          <div class="text-secondary small">Shared pool</div>
-        </div>
-        <div class="input-group input-group-sm mt-2">
-          <span class="input-group-text">Coins</span>
-          <input type="number" class="form-control" min="0" max="999999" data-k="silverCoins" value="${state.silverCoins || 0}">
-        </div>
-      </div>
-    </div>
-  `;
-  pe.appendChild(partyMeta);
-
   clampSelectedPartyIndex();
 
   const layout = document.createElement("div");
@@ -1440,10 +1429,11 @@ function renderEditors() {
     detailArea.appendChild(sheet);
   }
 
-    layout.appendChild(detailArea);
-    pe.appendChild(layout);
-    renderVaultSection();
-    renderMissionNotes();
+  layout.appendChild(detailArea);
+  pe.appendChild(layout);
+  renderVaultSection();
+  renderPartySilver();
+  renderMissionNotes();
 
     const me = $("mobEditor");
     me.innerHTML = "";
@@ -1555,6 +1545,7 @@ function renderEditors() {
     state.vault = normalizeVaultItems(state.vault);
 
     if (input) {
+      input.setAttribute("list", "itemOptions");
       input.onkeydown = (e) => {
         if (e.key === "Enter") {
           e.preventDefault();
@@ -1587,6 +1578,28 @@ function renderEditors() {
       const idx = Number(el.getAttribute("data-del-vault"));
       removeVaultItem(idx);
     }));
+  }
+
+  function renderPartySilver() {
+    const holder = $("partySilver");
+    if (!holder) return;
+
+    holder.innerHTML = `
+      <div class="lk-silver-card">
+        <div class="d-flex align-items-center justify-content-between gap-2">
+          <div>
+            <p class="text-uppercase small text-secondary fw-semibold mb-1">Party silver</p>
+            <div class="text-secondary small">Shared pool</div>
+          </div>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text">Coins</span>
+            <input type="number" class="form-control" min="0" max="999999" data-k="silverCoins" value="${state.silverCoins || 0}" aria-label="Party silver coins">
+          </div>
+        </div>
+      </div>
+    `;
+
+    holder.querySelectorAll('[data-k="silverCoins"]').forEach(el => el.addEventListener("change", onPartyEdit));
   }
 
   function renderMissionNotes() {
@@ -1906,10 +1919,13 @@ function renderCodes() {
   `).join("");
 
   const codes = state.codes[activeKey] || [];
+  const totalCodes = codesLengthForBook(activeKey);
+  const rows = Math.ceil(totalCodes / 10) || 1;
   const cells = [];
-  for (let row = 0; row < 10; row++) {
+  for (let row = 0; row < rows; row++) {
     for (let col = 0; col < 10; col++) {
-      const num = row + 1 + (col * 10);
+      const num = row + 1 + (col * rows);
+      if (num > totalCodes) continue;
       const idx = num - 1;
       const codeId = `${activeKey}${num}`;
       cells.push(`
@@ -1935,7 +1951,8 @@ function renderCodes() {
 function onCodeToggle(e) {
   const book = e.target.getAttribute("data-code-book");
   const idx = Number(e.target.getAttribute("data-code-index"));
-  if (!book || Number.isNaN(idx) || idx < 0 || idx >= 100) return;
+  const max = codesLengthForBook(book);
+  if (!book || Number.isNaN(idx) || idx < 0 || idx >= max) return;
   state.codes = normalizeCodes(state.codes);
   state.codes[book][idx] = !!e.target.checked;
   saveSetupToStorage(state);
