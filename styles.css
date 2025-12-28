@@ -88,32 +88,27 @@
 }
 
 /* -----------------------------
-   Party management: card grid
+   Party management: portrait rail + sheet
 -------------------------------- */
 
-.lk-party-grid{
+.lk-party-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.lk-party-shell {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: minmax(220px, 260px) 1fr;
   gap: 1rem;
   align-items: start;
 }
 
-/* Treat each direct child as a "character card" */
-#partyEditor.lk-party-grid > *{
-  border: 1px solid var(--lk-border);
-  border-radius: var(--lk-radius);
-  background: var(--bs-body-bg);
-  box-shadow: var(--lk-shadow-sm);
-  overflow: clip;
-  padding: 1rem;
-}
-
 .lk-party-resources {
-  grid-column: 1 / -1;
   display: flex;
   align-items: stretch;
   border: 1px solid var(--lk-border);
-  border-radius: var(--lk-radius);
+  border-radius: 1rem;
   background: var(--bs-body-bg);
   box-shadow: var(--lk-shadow-sm);
   padding: 1rem;
@@ -123,189 +118,147 @@
   display: flex;
   align-items: center;
   gap: 1rem;
-  width: 100%;
+  border: 1px dashed var(--bs-border-color);
+  border-radius: .9rem;
+  padding: 1rem;
+  flex: 1;
+  background: color-mix(in oklab, var(--bs-body-bg) 70%, var(--bs-tertiary-bg) 30%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
 }
 
 .lk-resource-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 3rem;
-  height: 3rem;
-  border-radius: .9rem;
-  background: color-mix(in oklab, var(--bs-warning-bg-subtle) 85%, transparent);
+  width: 48px;
+  height: 48px;
+  border-radius: .85rem;
+  display: grid;
+  place-items: center;
+  background: color-mix(in oklab, var(--bs-warning-bg-subtle) 60%, transparent);
   border: 1px solid color-mix(in oklab, var(--bs-warning-border-subtle) 60%, transparent);
   font-size: 1.4rem;
   box-shadow: 0 .35rem .85rem rgba(0,0,0,.06);
 }
 
-.hero-avatar {
-  border-radius: .85rem;
-}
-
-.hero-heading {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.party-card {
-  border: 2px solid var(--bs-border-color);
-  border-radius: 1rem;
-  box-shadow: 0 .65rem 1.6rem rgba(0,0,0,.06);
-}
-
-.party-card .panel-body {
-  padding: 1rem;
-}
-
-.hero-meta {
-  flex: 1;
-  min-width: 0;
-}
-
-.hero-name {
-  display: inline-flex;
-  align-items: center;
-  gap: .4rem;
-  padding: .45rem .75rem;
-  border-radius: .75rem;
-  border: 1px dashed var(--bs-border-color);
-  background: color-mix(in oklab, var(--bs-secondary-bg-subtle) 55%, transparent);
-  font-weight: 700;
-  letter-spacing: .01em;
-  max-width: 100%;
-  word-break: break-word;
-}
-
-.hero-meta__row {
-  min-height: 48px;
-}
-
-/* Headings inside a character card */
-#partyEditor.lk-party-grid > * :is(h1,h2,h3,h4,h5){
-  margin: 0 0 .75rem 0;
-  line-height: 1.2;
-}
-
-/* Reduce random spacing patterns from legacy markup */
-#partyEditor.lk-party-grid > * :is(.row, .form-group, .input-group, .btn-group){
-  margin-top: 0;
-}
-
-/* Normalize grid gutters if JS uses .row/.col-* patterns */
-#partyEditor.lk-party-grid .row{
-  --bs-gutter-x: .75rem;
-  --bs-gutter-y: .75rem;
-}
-
-/* Make labels look consistent and “sheet-like” */
-#partyEditor.lk-party-grid label{
-  font-size: .75rem;
-  letter-spacing: .02em;
-  text-transform: uppercase;
-  color: var(--bs-secondary-color);
-  margin-bottom: .25rem;
-}
-
-/* Inputs/selects: consistent sizing */
-#partyEditor.lk-party-grid :is(input[type="text"], input[type="number"], select, textarea){
-  border-radius: .7rem;
-}
-
-/* “Section” styling for common block containers (stats/inventory/etc.) */
-#partyEditor.lk-party-grid :is(
-  .stats, .statblock, .character-stats,
-  .inventory, .inv, .equipment,
-  [class*="stats"], [class*="inventory"],
-  [id*="stats"], [id*="inventory"]
-){
-  margin-top: .85rem;
-  padding-top: .85rem;
-  border-top: 1px dashed color-mix(in oklab, var(--bs-border-color) 60%, transparent);
-}
-
-/* Inventory buttons: flow nicely instead of looking scattered */
-#partyEditor.lk-party-grid :is(
-  .inventory, .inv, .equipment,
-  [class*="inventory"], [id*="inventory"]
-){
-  display: flex;
-  flex-wrap: wrap;
-  gap: .5rem;
-  align-items: center;
-}
-
-/* Any obvious "button rows" align cleanly */
-#partyEditor.lk-party-grid .text-right,
-#partyEditor.lk-party-grid .actions,
-#partyEditor.lk-party-grid [class*="actions"],
-#partyEditor.lk-party-grid [class*="controls"]{
-  display: flex;
-  flex-wrap: wrap;
-  gap: .5rem;
-  justify-content: flex-end;
-  align-items: center;
-}
-
-/* Small buttons look more intentional */
-#partyEditor.lk-party-grid .btn{
-  border-radius: .8rem;
-}
-
-/* If JS outputs tables inside a character card, keep them compact */
-#partyEditor.lk-party-grid table{
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  border: 1px solid var(--lk-border);
-  border-radius: var(--lk-radius-sm);
-  overflow: hidden;
-  margin-top: .75rem;
-}
-#partyEditor.lk-party-grid th,
-#partyEditor.lk-party-grid td{
-  padding: .45rem .55rem;
-  border-bottom: 1px solid var(--lk-border);
-  vertical-align: middle;
-}
-#partyEditor.lk-party-grid tr:last-child td{ border-bottom: none; }
-
-.spell-card {
-  margin-top: .75rem;
-  padding: .75rem 1rem;
-  border: 1px solid var(--lk-border);
-  border-radius: var(--lk-radius);
-  background: var(--bs-tertiary-bg);
-}
-
-.spell-card summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: .5rem;
-  cursor: pointer;
-  font-weight: 700;
-  letter-spacing: .01em;
-  list-style: none;
-}
-
-.spell-card summary::-webkit-details-marker { display: none; }
-
-.spell-body {
-  margin-top: .75rem;
+.lk-portrait-rail {
   display: flex;
   flex-direction: column;
   gap: .75rem;
+  padding: .25rem;
+  background: color-mix(in oklab, var(--bs-tertiary-bg) 70%, transparent);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 1rem;
 }
 
-.spell-row {
-  display: flex;
-  gap: .75rem;
-  flex-wrap: wrap;
+.lk-portrait-tab {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  align-items: center;
+  gap: .65rem;
+  width: 100%;
+  padding: .65rem;
+  background: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: .85rem;
+  box-shadow: var(--lk-shadow-sm);
+  transition: border-color .15s ease, background-color .15s ease, transform .15s ease;
 }
 
-.spell-row label { flex: 1 1 220px; }
+.lk-portrait-tab:hover { transform: translateY(-1px); }
+.lk-portrait-tab.is-active { border-color: var(--bs-primary-border-subtle); box-shadow: 0 .45rem 1.2rem rgba(0,0,0,.08); }
+.lk-portrait-tab.is-active .lk-portrait-name { color: var(--bs-primary); }
+
+.lk-portrait-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: .85rem;
+  object-fit: cover;
+}
+
+.lk-portrait-name { font-weight: 700; margin: 0; }
+.lk-portrait-meta { color: var(--bs-secondary-color); font-size: .9rem; }
+
+.lk-party-sheet {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 1rem;
+  box-shadow: 0 .65rem 1.6rem rgba(0,0,0,.06);
+  background: var(--bs-body-bg);
+}
+
+.lk-sheet__header { padding: 1.25rem 1.25rem 0 1.25rem; }
+.lk-sheet__body { padding: 1.25rem; display: grid; gap: 1.25rem; }
+
+.lk-sheet__topline {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  align-items: center;
+}
+
+.lk-sheet__portrait {
+  width: 120px;
+  height: 120px;
+  border-radius: 1rem;
+  object-fit: cover;
+  box-shadow: 0 .45rem 1.4rem rgba(0,0,0,.08);
+}
+
+.lk-name-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .6rem .9rem;
+  border-radius: .9rem;
+  border: 1px dashed var(--bs-border-color);
+  background: color-mix(in oklab, var(--bs-secondary-bg-subtle) 55%, transparent);
+  font-weight: 800;
+  letter-spacing: .01em;
+  font-size: 1.05rem;
+}
+
+.lk-chipline { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
+
+.lk-sheet__cta { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: flex-end; }
+
+.lk-sheet__grid {
+  display: grid;
+  gap: 1.2rem;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.lk-section {
+  padding: 1rem;
+  border: 1px dashed color-mix(in oklab, var(--bs-border-color) 60%, transparent);
+  border-radius: .9rem;
+  background: color-mix(in oklab, var(--bs-tertiary-bg) 60%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.4);
+}
+
+.lk-section-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .65rem; }
+.lk-section-title { margin: 0; font-size: .95rem; letter-spacing: .02em; text-transform: uppercase; color: var(--bs-secondary-color); }
+
+.equipment-stack { display: flex; flex-direction: column; gap: .75rem; }
+.equip-row { border: 1px solid var(--bs-border-color); border-radius: .9rem; padding: .75rem; background: var(--bs-body-bg); box-shadow: var(--lk-shadow-sm); }
+.equip-help { margin-top: .35rem; font-size: .9rem; color: var(--bs-secondary-color); }
+.equipment-meta { margin-top: .35rem; }
+
+.lk-notes { width: 100%; min-height: 140px; }
+
+.spell-card { border: 1px solid var(--bs-border-color); border-radius: .9rem; padding: .85rem; background: color-mix(in oklab, var(--bs-body-bg) 80%, var(--bs-tertiary-bg) 20%); }
+.spell-card summary { font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.spell-body { margin-top: .6rem; display: flex; flex-direction: column; gap: .75rem; }
+.spell-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .5rem; align-items: center; }
+
+.lk-empty-sheet { border: 1px dashed var(--bs-border-color); border-radius: 1rem; padding: 1.5rem; text-align: center; color: var(--bs-secondary-color); }
+
+@media (max-width: 991.98px) {
+  .lk-party-shell { grid-template-columns: 1fr; }
+  .lk-portrait-rail { flex-direction: row; flex-wrap: wrap; }
+  .lk-portrait-tab { width: calc(50% - .5rem); }
+}
+
+@media (max-width: 575.98px) {
+  .lk-sheet__topline { grid-template-columns: 1fr; }
+  .lk-portrait-tab { width: 100%; }
+}
 
 /* Dialog fallback styling (native <dialog>) */
 .lk-dialog {
