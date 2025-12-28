@@ -16,6 +16,15 @@ const HERO_NAMES = [
   "Brash",
 ];
 
+const HERO_DEFAULT_STATS = {
+  "Sar Jessica Dayne": { fighting: 5, survival: 2, stealth: 1, charisma: 4, lore: 3, health: 8, maxHealth: 8 },
+  "Lord Ti’quon": { fighting: 1, survival: 1, stealth: 2, charisma: 2, lore: 5, health: 6, maxHealth: 6 },
+  "Tasha": { fighting: 3, survival: 3, stealth: 5, charisma: 3, lore: 1, health: 8, maxHealth: 8 },
+  "Amelia Pass-Dayne": { fighting: 3, survival: 3, stealth: 2, charisma: 1, lore: 2, health: 6, maxHealth: 6 },
+  "Akihiro of Chalice": { fighting: 4, survival: 5, stealth: 3, charisma: 1, lore: 2, health: 8, maxHealth: 8 },
+  "Brash": { fighting: 2, survival: 1, stealth: 4, charisma: 5, lore: 3, health: 8, maxHealth: 8 },
+};
+
 const HERO_IMAGES = {
   "Sar Jessica Dayne": "./img/jessica.png",
   "Lord Ti’quon": "./img/tiquon.png",
@@ -473,16 +482,17 @@ function loadSetupFromStorage(state) {
 }
 
 function newMember(name, seed = null) {
+  const defaults = HERO_DEFAULT_STATS[name] || {};
   const base = {
     name,
-    fighting: 3,
-    stealth: 0,
-    lore: 0,
-    survival: 0,
-    charisma: 0,
-    armour: 0,
-    health: 8,
-    maxHealth: 8,
+    fighting: defaults.fighting ?? 3,
+    stealth: defaults.stealth ?? 0,
+    lore: defaults.lore ?? 0,
+    survival: defaults.survival ?? 0,
+    charisma: defaults.charisma ?? 0,
+    armour: defaults.armour ?? 0,
+    health: defaults.health ?? 8,
+    maxHealth: defaults.maxHealth ?? defaults.health ?? 8,
     dead: false,
     actedThisRound: false,
     buffs: [],
