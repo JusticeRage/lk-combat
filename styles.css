@@ -271,7 +271,27 @@
 }
 
 .lk-portrait-name { font-weight: 700; margin: 0; }
-.lk-portrait-meta { color: var(--bs-secondary-color); font-size: .9rem; }
+.lk-portrait-hp {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+
+.lk-portrait-hp-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.lk-portrait-hp-title {
+  font-size: .75rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+}
+
+.lk-portrait-hp-num {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.lk-portrait-hp .progress { height: .35rem; border-radius: 999px; background: var(--bs-tertiary-bg); }
+.lk-portrait-hp .progress-bar { border-radius: 999px; }
 
 .lk-party-sheet {
   border: 1px solid var(--bs-border-color);
