@@ -143,6 +143,45 @@
   border-radius: .85rem;
 }
 
+.hero-heading {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.party-card {
+  border: 2px solid var(--bs-border-color);
+  border-radius: 1rem;
+  box-shadow: 0 .65rem 1.6rem rgba(0,0,0,.06);
+}
+
+.party-card .panel-body {
+  padding: 1rem;
+}
+
+.hero-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.hero-name {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .45rem .75rem;
+  border-radius: .75rem;
+  border: 1px dashed var(--bs-border-color);
+  background: color-mix(in oklab, var(--bs-secondary-bg-subtle) 55%, transparent);
+  font-weight: 700;
+  letter-spacing: .01em;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.hero-meta__row {
+  min-height: 48px;
+}
+
 /* Headings inside a character card */
 #partyEditor.lk-party-grid > * :is(h1,h2,h3,h4,h5){
   margin: 0 0 .75rem 0;
@@ -267,12 +306,6 @@
 }
 
 .spell-row label { flex: 1 1 220px; }
-
-.hero-name {
-  font-weight: 700;
-  letter-spacing: .01em;
-  border-style: dashed;
-}
 
 /* Dialog fallback styling (native <dialog>) */
 .lk-dialog {
