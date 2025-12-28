@@ -716,9 +716,14 @@ function buildLatestRoll(groups) {
   const norm = Array.isArray(groups) ? groups : [];
   const built = norm.map(entry => {
     const rolls = Array.isArray(entry?.rolls) ? entry.rolls : [];
-    const successMask = rolls.map(r => entry?.successPredicate
-      ? entry.successPredicate(r)
-      : (entry?.target != null ? r >= entry.target : false));
+    let successMask = Array.isArray(entry?.successMask) ? entry.successMask.map(Boolean) : [];
+
+    if (successMask.length !== rolls.length) {
+      successMask = rolls.map((r, idx) => entry?.successPredicate
+        ? entry.successPredicate(r, idx)
+        : (entry?.target != null ? r >= entry.target : false));
+    }
+
     return {
       rolls: [...rolls],
       successes: successMask.filter(Boolean).length,
@@ -1910,9 +1915,11 @@ function renderSkillCheck() {
   rollBtn.disabled = !(heroes.length >= neededHeroes && diceInfo.dice > 0);
 
   if (sc.lastResult) {
-    outcome.textContent = sc.lastResult.success ? "✅ Success" : "❌ Failure";
+    const alertCls = sc.lastResult.success ? "alert-success" : "alert-danger";
+    const text = sc.lastResult.success ? "✅ Success" : "❌ Failure";
+    outcome.innerHTML = `<div class="alert ${alertCls} text-center mb-0">${text}</div>`;
   } else {
-    outcome.textContent = "";
+    outcome.innerHTML = "";
   }
 
   renderSkillRoll();
