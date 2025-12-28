@@ -186,36 +186,6 @@
 .lk-sheet__header { padding: 1.25rem 1.25rem 0 1.25rem; }
 .lk-sheet__body { padding: 1.25rem; display: grid; gap: 1.25rem; }
 
-.lk-sheet__topline {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 1rem;
-  align-items: center;
-}
-
-.lk-sheet__portrait {
-  width: 120px;
-  height: 120px;
-  border-radius: 1rem;
-  object-fit: cover;
-  box-shadow: 0 .45rem 1.4rem rgba(0,0,0,.08);
-}
-
-.lk-name-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: .5rem;
-  padding: .6rem .9rem;
-  border-radius: .9rem;
-  border: 1px dashed var(--bs-border-color);
-  background: color-mix(in oklab, var(--bs-secondary-bg-subtle) 55%, transparent);
-  font-weight: 800;
-  letter-spacing: .01em;
-  font-size: 1.05rem;
-}
-
-.lk-chipline { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
-
 .lk-sheet__cta { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: flex-end; }
 
 .lk-sheet__grid {
@@ -242,9 +212,16 @@
 
 .lk-notes { width: 100%; min-height: 140px; }
 
-.spell-card { border: 1px solid var(--bs-border-color); border-radius: .9rem; padding: .85rem; background: color-mix(in oklab, var(--bs-body-bg) 80%, var(--bs-tertiary-bg) 20%); }
-.spell-card summary { font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-.spell-body { margin-top: .6rem; display: flex; flex-direction: column; gap: .75rem; }
+.spell-card {
+  border: 1px solid var(--bs-border-color);
+  border-radius: .9rem;
+  padding: .85rem;
+  background: color-mix(in oklab, var(--bs-body-bg) 80%, var(--bs-tertiary-bg) 20%);
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+.spell-body { display: flex; flex-direction: column; gap: .75rem; margin: 0; }
 .spell-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .5rem; align-items: center; }
 
 .lk-empty-sheet { border: 1px dashed var(--bs-border-color); border-radius: 1rem; padding: 1.5rem; text-align: center; color: var(--bs-secondary-color); }
@@ -256,7 +233,6 @@
 }
 
 @media (max-width: 575.98px) {
-  .lk-sheet__topline { grid-template-columns: 1fr; }
   .lk-portrait-tab { width: 100%; }
 }
 
