@@ -302,6 +302,42 @@ function formatStatBadge(key, stat) {
   return `${icon}${label}: ${stat.base} (${stat.modified})`;
 }
 
+function formatCompactStat(stat) {
+  return (stat?.modified === stat?.base)
+    ? `${stat.modified}`
+    : `${stat.base} (${stat.modified})`;
+}
+
+function renderHpBlock(entity) {
+  const current = Math.max(0, entity?.health ?? 0);
+  const max = Math.max(1, entity?.maxHealth ?? 1);
+  const pct = Math.min(100, Math.max(0, (current / max) * 100));
+  return `
+    <div class="lk-hp" aria-label="Hit points">
+      <div class="lk-hp-head">
+        <span class="lk-hp-title">HP</span>
+        <span class="lk-hp-num">${current}/${max}</span>
+      </div>
+      <div class="progress" role="progressbar" aria-valuenow="${current}" aria-valuemin="0" aria-valuemax="${max}">
+        <div class="progress-bar" style="width:${pct}%"></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderStatGrid(hero) {
+  const stats = computeDisplayedStats(hero);
+  const order = ["fighting", "armour", "stealth", "lore", "survival", "charisma"];
+  return `
+    <div class="lk-stat-grid">
+      ${order.map(key => `
+        <div class="lk-stat-label">${STAT_LABELS[key]}</div>
+        <div class="lk-stat-value">${escapeHtml(formatCompactStat(stats[key]))}</div>
+      `).join("")}
+    </div>
+  `;
+}
+
 function describeItem(item, entry) {
   if (!item) return "No item";
   const details = [];
@@ -917,14 +953,6 @@ function renderEditors() {
     const p = state.party[state.selectedPartyIndex];
     enforceWeaponHandLimit(p);
     const equipment = normalizeEquipmentList(p.equipment, { keepEmpty: true });
-    const statBadges = (() => {
-      const stats = computeDisplayedStats(p);
-      const statKeys = ["fighting", "stealth", "lore", "survival", "charisma", "armour"];
-      const hpBadge = `<span class="pill stat-pill">HP: ${Math.max(0, p.health)}/${p.maxHealth}</span>`;
-      return statKeys
-        .map(k => `<span class="pill stat-pill">${escapeHtml(formatStatBadge(k, stats[k]))}</span>`)
-        .join("") + hpBadge;
-    })();
 
     const equipmentRows = equipment.map((eqRaw, slot) => {
       const eq = normalizeEquipmentEntry(eqRaw);
@@ -932,38 +960,62 @@ function renderEditors() {
       const isWeapon = item?.type === "weapon";
       const itemLabel = escapeHtml(item?.name || eq.custom || "");
       const detailText = item ? describeItem(item, eq) : (eq.custom ? "Custom item" : "No item");
-      return `
-      <div class="equip-row">
-        <div class="row g-3 align-items-center">
-          <div class="col-md-6">
-            <input type="text" class="form-control form-control-sm" list="itemOptions" data-k="equipment" data-field="name" data-ei="${slot}" data-i="${state.selectedPartyIndex}" value="${itemLabel}" placeholder="Item name" aria-label="Item name">
-          </div>
-          ${item?.countable ? `
-            <div class="col-sm-6 col-md-2">
-              <label class="form-label small">Count</label>
-              <input type="number" class="form-control form-control-sm" min="1" max="999" data-k="equipment" data-field="count" data-ei="${slot}" data-i="${state.selectedPartyIndex}" value="${eq.count || 1}">
-            </div>
-          ` : ""}
-          ${isWeapon ? `
-            <div class="col-sm-6 col-md-3">
-              <div class="form-check mb-0">
-                <input class="form-check-input" type="checkbox" data-k="equipment" data-field="equipped" data-ei="${slot}" data-i="${state.selectedPartyIndex}" ${eq.equipped ? "checked" : ""} id="equip-${state.selectedPartyIndex}-${slot}">
-                <label class="form-check-label small" for="equip-${state.selectedPartyIndex}-${slot}">Equipped</label>
+      const spells = Array.isArray(eq.spells) ? eq.spells.filter(Boolean) : [];
+      const equippedId = `equip-${state.selectedPartyIndex}-${slot}`;
+      const spellBadge = spells.length ? `<span class="badge text-bg-info lk-badge">Spell ×${spells.length}</span>` : "";
+      const spellDetails = spells.length ? `
+        <tr class="lk-details">
+          <td colspan="3">
+            <details class="lk-details__inner">
+              <summary>Spells (${spells.length})</summary>
+              <div class="lk-details__body">
+                ${spells.map((sp, idx) => `<div class="lk-details__row">${escapeHtml(typeof sp === "string" ? sp : sp?.name || sp?.id || `Spell ${idx + 1}`)}</div>`).join("")}
               </div>
+            </details>
+          </td>
+        </tr>
+      ` : "";
+
+      return `
+        <tr>
+          <td>
+            <div class="d-flex flex-column gap-2">
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <input type="text" class="form-control form-control-sm" list="itemOptions" data-k="equipment" data-field="name" data-ei="${slot}" data-i="${state.selectedPartyIndex}" value="${itemLabel}" placeholder="Item name" aria-label="Item name">
+                ${spellBadge}
+              </div>
+              ${item?.countable ? `
+                <div class="d-flex align-items-center gap-2">
+                  <label class="form-label small mb-0" for="count-${state.selectedPartyIndex}-${slot}">Count</label>
+                  <input id="count-${state.selectedPartyIndex}-${slot}" type="number" class="form-control form-control-sm w-auto" min="1" max="999" data-k="equipment" data-field="count" data-ei="${slot}" data-i="${state.selectedPartyIndex}" value="${eq.count || 1}">
+                </div>
+              ` : ""}
+              ${detailText ? `<div class="text-body-secondary small">${escapeHtml(detailText)}</div>` : ""}
             </div>
-          ` : ""}
-          <div class="col-sm-6 col-md-3 d-flex justify-content-end align-items-center">
-            <button class="btn btn-outline-danger btn-sm" data-del-equipment="${slot}" data-i="${state.selectedPartyIndex}">Remove</button>
-          </div>
-        </div>
-        ${detailText ? `<div class="muted equip-help">${escapeHtml(detailText)}</div>` : ""}
-      </div>
-    `;
+          </td>
+          <td class="text-center">
+            ${isWeapon ? `
+              <div class="form-check form-switch lk-equip-switch">
+                <input class="form-check-input" type="checkbox" data-k="equipment" data-field="equipped" data-ei="${slot}" data-i="${state.selectedPartyIndex}" ${eq.equipped ? "checked" : ""} id="${equippedId}">
+                <label class="form-check-label" for="${equippedId}">Equipped</label>
+              </div>
+            ` : `<span class="text-body-secondary small">—</span>`}
+          </td>
+          <td class="lk-actions-col">
+            <div class="lk-actions">
+              <button class="btn btn-outline-danger btn-sm lk-icon-btn" data-del-equipment="${slot}" data-i="${state.selectedPartyIndex}" aria-label="Remove item">
+                <i class="bi bi-trash" aria-hidden="true"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+        ${spellDetails}
+      `;
     }).join("");
 
     const equipmentMeta = `
       <div class="d-flex justify-content-between align-items-center equipment-meta">
-        <div class="muted small">${equipment.length}/${EQUIPMENT_SLOTS} slots used</div>
+        <div class="text-body-secondary small">${equipment.length}/${EQUIPMENT_SLOTS} slots used</div>
         <button class="btn btn-outline-primary btn-sm" data-add-equipment="${state.selectedPartyIndex}" ${equipment.length >= EQUIPMENT_SLOTS ? "disabled" : ""}>Add slot</button>
       </div>
     `;
@@ -1000,10 +1052,17 @@ function renderEditors() {
     sheet.innerHTML = `
       <div class="lk-sheet__header">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-          <div class="stat-summary">${statBadges}</div>
+          <div class="d-flex flex-column flex-grow-1 gap-3">
+            ${renderHpBlock(p)}
+            ${renderStatGrid(p)}
+          </div>
           <div class="lk-sheet__cta">
-            <button class="btn btn-outline-secondary btn-sm" data-edit-stats="${state.selectedPartyIndex}">Edit stats</button>
-            <button class="btn btn-outline-danger btn-sm" data-del-party="${state.selectedPartyIndex}">Remove</button>
+            <button class="btn btn-outline-secondary btn-sm lk-icon-btn" data-edit-stats="${state.selectedPartyIndex}" aria-label="Edit stats">
+              <i class="bi bi-pencil" aria-hidden="true"></i>
+            </button>
+            <button class="btn btn-outline-danger btn-sm lk-icon-btn" data-del-party="${state.selectedPartyIndex}" aria-label="Remove hero">
+              <i class="bi bi-trash" aria-hidden="true"></i>
+            </button>
           </div>
         </div>
       </div>
@@ -1012,12 +1071,21 @@ function renderEditors() {
           <div class="lk-section">
             <div class="lk-section-heading">
               <p class="lk-section-title mb-0">Equipment</p>
-              <span class="text-secondary small">Weapons, armour, and gear</span>
+              <span class="text-body-secondary small">Weapons, armour, and gear</span>
             </div>
-            <div class="equipment-stack">
-              ${equipmentRows || `<div class="muted small">No equipment yet.</div>`}
-              ${equipmentMeta}
+            <div class="lk-table table-responsive">
+              <table class="table align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">Item</th>
+                    <th scope="col" class="text-center">Equipped</th>
+                    <th scope="col" class="lk-actions-col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>${equipmentRows || `<tr><td colspan="3" class="text-body-secondary small">No equipment yet.</td></tr>`}</tbody>
+              </table>
             </div>
+            ${equipmentMeta}
           </div>
           <div class="lk-section">
             <div class="lk-section-heading">
@@ -1050,18 +1118,44 @@ function renderEditors() {
   me.innerHTML = "";
   state.mobs.forEach((m, idx) => {
     const div = document.createElement("div");
-    div.className = "panel panel-default hero-card";
+    const idPrefix = `mob-${idx}`;
+    div.className = "card mb-3 shadow-sm";
     div.innerHTML = `
-      <div class="panel-body">
-        <div class="row">
-          <label>Name <input type="text" class="form-control input-sm" data-mk="name" data-mi="${idx}" value="${escapeHtml(m.name)}"></label>
-          <label>Atk dice <input type="number" class="form-control input-sm" min="0" max="50" data-mk="atkDice" data-mi="${idx}" value="${m.atkDice}"></label>
-          <label>Atk target <input type="number" class="form-control input-sm" min="2" max="6" data-mk="atkTarget" data-mi="${idx}" value="${m.atkTarget}"></label>
-          <label>Auto dmg <input type="number" class="form-control input-sm" min="0" max="50" data-mk="auto" data-mi="${idx}" value="${m.auto}"></label>
-          <label>Def target <input type="number" class="form-control input-sm" min="2" max="6" data-mk="defTarget" data-mi="${idx}" value="${m.defTarget}"></label>
-          <label>Max HP <input type="number" class="form-control input-sm" min="1" max="999" data-mk="maxHealth" data-mi="${idx}" value="${m.maxHealth}"></label>
-          <label>HP <input type="number" class="form-control input-sm" min="0" max="999" data-mk="health" data-mi="${idx}" value="${m.health}"></label>
-          <button class="btn btn-default btn-sm" data-del-mob="${idx}">Remove</button>
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-sm-6 col-lg-4">
+            <label class="form-label mb-1" for="${idPrefix}-name">Name</label>
+            <input id="${idPrefix}-name" type="text" class="form-control form-control-sm" data-mk="name" data-mi="${idx}" value="${escapeHtml(m.name)}">
+          </div>
+          <div class="col-6 col-md-4 col-lg-2">
+            <label class="form-label mb-1" for="${idPrefix}-atkDice">Atk dice</label>
+            <input id="${idPrefix}-atkDice" type="number" class="form-control form-control-sm" min="0" max="50" data-mk="atkDice" data-mi="${idx}" value="${m.atkDice}">
+          </div>
+          <div class="col-6 col-md-4 col-lg-2">
+            <label class="form-label mb-1" for="${idPrefix}-atkTarget">Atk target</label>
+            <input id="${idPrefix}-atkTarget" type="number" class="form-control form-control-sm" min="2" max="6" data-mk="atkTarget" data-mi="${idx}" value="${m.atkTarget}">
+          </div>
+          <div class="col-6 col-md-4 col-lg-2">
+            <label class="form-label mb-1" for="${idPrefix}-auto">Auto dmg</label>
+            <input id="${idPrefix}-auto" type="number" class="form-control form-control-sm" min="0" max="50" data-mk="auto" data-mi="${idx}" value="${m.auto}">
+          </div>
+          <div class="col-6 col-md-4 col-lg-2">
+            <label class="form-label mb-1" for="${idPrefix}-defTarget">Def target</label>
+            <input id="${idPrefix}-defTarget" type="number" class="form-control form-control-sm" min="2" max="6" data-mk="defTarget" data-mi="${idx}" value="${m.defTarget}">
+          </div>
+          <div class="col-6 col-md-4 col-lg-2">
+            <label class="form-label mb-1" for="${idPrefix}-maxHealth">Max HP</label>
+            <input id="${idPrefix}-maxHealth" type="number" class="form-control form-control-sm" min="1" max="999" data-mk="maxHealth" data-mi="${idx}" value="${m.maxHealth}">
+          </div>
+          <div class="col-6 col-md-4 col-lg-2">
+            <label class="form-label mb-1" for="${idPrefix}-health">HP</label>
+            <input id="${idPrefix}-health" type="number" class="form-control form-control-sm" min="0" max="999" data-mk="health" data-mi="${idx}" value="${m.health}">
+          </div>
+          <div class="col-12 col-md-auto ms-auto text-end">
+            <button class="btn btn-outline-danger btn-sm lk-icon-btn" data-del-mob="${idx}" aria-label="Remove opponent">
+              <i class="bi bi-trash" aria-hidden="true"></i>
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -1234,28 +1328,31 @@ function onMobEdit(e) {
 function renderTables() {
   const pt = $("partyTable");
   if (!state.party.length) {
-    pt.innerHTML = `<div class="muted">No party members.</div>`;
+    pt.innerHTML = `<div class="text-body-secondary">No party members.</div>`;
   } else {
     const rows = state.party.map(p => {
       enforceWeaponHandLimit(p);
       const acted = (state.phase === "combat" && state.turn === "party")
-        ? (p.actedThisRound ? `<span class="pill">Acted</span>` : `<span class="pill">Ready</span>`)
+        ? (p.actedThisRound ? `<span class="badge text-bg-secondary ms-2">Acted</span>` : `<span class="badge text-bg-success ms-2">Ready</span>`)
         : "";
       const stats = computeDisplayedStats(p);
-      const statLine = ["fighting", "armour"]
-        .map(k => `<span class="pill stat-pill">${escapeHtml(formatStatBadge(k, stats[k]))}</span>`)
-        .join(" ");
       return `
         <tr class="${(p.dead||p.health<=0) ? "dead" : ""}">
-          <td>${p.name} ${acted}</td>
-          <td>${statLine}</td>
-          <td>${Math.max(0,p.health)}/${p.maxHealth}</td>
+          <td>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <span>${escapeHtml(p.name)}</span>
+              ${acted}
+            </div>
+          </td>
+          <td class="lk-stat-value">${escapeHtml(formatCompactStat(stats.fighting))}</td>
+          <td class="lk-stat-value">${escapeHtml(formatCompactStat(stats.armour))}</td>
+          <td>${renderHpBlock(p)}</td>
         </tr>
       `;
     }).join("");
     pt.innerHTML = `
-      <table>
-        <thead><tr><th>Name</th><th>Stats</th><th>HP</th></tr></thead>
+      <table class="table align-middle mb-0">
+        <thead><tr><th>Hero</th><th>Fight</th><th>Arm</th><th>HP</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
@@ -1263,19 +1360,19 @@ function renderTables() {
 
   const mt = $("mobTable");
   if (!state.mobs.length) {
-    mt.innerHTML = `<div class="muted">No opponents.</div>`;
+    mt.innerHTML = `<div class="text-body-secondary">No opponents.</div>`;
   } else {
     const rows = state.mobs.map((m, idx) => `
       <tr class="${(m.dead||m.health<=0) ? "dead" : ""}">
         <td>${m.name}</td>
         <td>${m.atkDice} (${m.atkTarget}+ )${m.auto ? ` +${m.auto} Auto` : ""}</td>
         <td>${m.defTarget}+</td>
-        <td>${Math.max(0,m.health)}/${m.maxHealth}</td>
-        <td class="muted">${state.turn==="enemies" && idx===state.enemyIndex ? "← acting" : ""}</td>
+        <td>${renderHpBlock(m)}</td>
+        <td class="text-body-secondary">${state.turn==="enemies" && idx===state.enemyIndex ? "← acting" : ""}</td>
       </tr>
     `).join("");
     mt.innerHTML = `
-      <table>
+      <table class="table align-middle mb-0">
         <thead><tr><th>Name</th><th>Attack</th><th>Def</th><th>HP</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -1474,7 +1571,7 @@ function openSpellDialog() {
         spellSel.appendChild(opt);
         spellSel.disabled = true;
       const area = $("spellTargetArea");
-      area.innerHTML = `<div class="muted">${caster ? "No prepared spells for this caster." : "Select a caster."}</div>`;
+      area.innerHTML = `<div class="text-body-secondary">${caster ? "No prepared spells for this caster." : "Select a caster."}</div>`;
       return;
     }
 
@@ -1516,7 +1613,7 @@ function openSpellDialog() {
 
     const chk = canCastSpell(caster, sp);
     if (!chk.ok) {
-      area.innerHTML = `<div class="muted">${chk.reason}</div>`;
+      area.innerHTML = `<div class="text-body-secondary">${chk.reason}</div>`;
       return;
     }
 
@@ -1827,7 +1924,6 @@ function openHeroDialogPopulate() {
 }
 
 (function main() {
-  syncPreferredTheme();
   initState();
   initUI();
 

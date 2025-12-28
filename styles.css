@@ -7,6 +7,103 @@
     linear-gradient(180deg, var(--bs-body-bg), var(--bs-body-bg));
 }
 
+.lk-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: .2rem .75rem;
+  align-items: center;
+}
+
+.lk-stat-label {
+  font-size: .75rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+  white-space: nowrap;
+}
+
+.lk-stat-value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lk-hp {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  min-width: 180px;
+}
+
+.lk-hp-head { display: flex; align-items: center; justify-content: space-between; }
+
+.lk-hp-title {
+  font-size: .8rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+}
+
+.lk-hp-num {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lk-hp .progress { height: .45rem; border-radius: 999px; background: var(--bs-tertiary-bg); }
+.lk-hp .progress-bar { border-radius: 999px; }
+
+.lk-table {
+  border: 1px solid var(--bs-border-color);
+  border-radius: .9rem;
+  overflow: hidden;
+  background: var(--bs-body-bg);
+}
+
+.lk-table.table-responsive { overflow: auto; }
+
+.lk-table table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+}
+
+.lk-table thead { background: var(--bs-tertiary-bg); }
+
+.lk-table th,
+.lk-table td {
+  padding: .75rem;
+  border-bottom: 1px solid var(--bs-border-color);
+  vertical-align: middle;
+}
+
+.lk-table th { font-weight: 700; white-space: nowrap; }
+.lk-table tbody tr:last-child td { border-bottom: none; }
+
+.lk-actions-col { width: 96px; text-align: right; white-space: nowrap; }
+.lk-actions { display: inline-flex; justify-content: flex-end; gap: .35rem; width: 100%; }
+
+.lk-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
+}
+
+.lk-equip-switch { margin: 0; display: flex; align-items: center; justify-content: center; gap: .35rem; }
+.lk-equip-switch .form-check-input { width: 2.6em; height: 1.3em; }
+.lk-equip-switch .form-check-label { margin: 0; color: var(--bs-secondary-color); font-size: .88rem; }
+
+.lk-badge { font-weight: 700; letter-spacing: .02em; }
+
+.lk-details { background: color-mix(in oklab, var(--bs-tertiary-bg) 65%, transparent); }
+.lk-details summary { cursor: pointer; color: var(--bs-secondary-color); font-weight: 700; }
+.lk-details__inner { padding: .5rem .75rem; border-radius: .5rem; border: 1px dashed var(--bs-border-color); }
+.lk-details__body { display: grid; gap: .25rem; margin-top: .35rem; }
+.lk-details__row { font-size: .9rem; color: var(--bs-secondary-color); }
+
 .lk-pill {
   font-weight: 600;
   padding: .5rem .6rem;
