@@ -513,11 +513,22 @@ function describeItem(item, entry) {
   return details.join(" • ");
 }
 
+function normalizeVaultItems(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map(entry => (typeof entry === "string" ? entry.trim() : ""))
+    .filter(Boolean);
+}
+
 function saveSetupToStorage(state) {
   state.codes = normalizeCodes(state.codes);
   state.selectedCodeBook = normalizeBookKey(state.selectedCodeBook);
+  state.vault = normalizeVaultItems(state.vault);
+  state.missionNotes = typeof state.missionNotes === "string" ? state.missionNotes : "";
   const payload = {
     silverCoins: state.silverCoins || 0,
+    vault: state.vault,
+    missionNotes: state.missionNotes,
     party: state.party.map(p => ({
       name: p.name,
       fighting: p.fighting,
@@ -563,6 +574,8 @@ function loadSetupFromStorage(state) {
     state.selectedCodeBook = normalizeBookKey(obj.selectedCodeBook);
 
     state.silverCoins = clampInt(obj.silverCoins, 0, 999999, 0);
+    state.vault = normalizeVaultItems(obj.vault);
+    state.missionNotes = typeof obj.missionNotes === "string" ? obj.missionNotes : "";
 
     if (Array.isArray(obj.party)) {
       const seen = new Set();
@@ -726,6 +739,8 @@ const state = {
   turn: "party", // party | enemies
   party: [],
   silverCoins: 0,
+  vault: [],
+  missionNotes: "",
   mobs: [],
   enemyIndex: 0,
   log: [],
@@ -1425,55 +1440,58 @@ function renderEditors() {
     detailArea.appendChild(sheet);
   }
 
-  layout.appendChild(detailArea);
-  pe.appendChild(layout);
-  const me = $("mobEditor");
-  me.innerHTML = "";
-  state.mobs.forEach((m, idx) => {
-    const div = document.createElement("div");
-    const idPrefix = `mob-${idx}`;
-    div.className = "card mb-3 shadow-sm";
-    div.innerHTML = `
-      <div class="card-body">
-        <div class="row g-3 align-items-end">
-          <div class="col-sm-6 col-lg-4">
-            <label class="form-label mb-1" for="${idPrefix}-name">Name</label>
-            <input id="${idPrefix}-name" type="text" class="form-control form-control-sm" data-mk="name" data-mi="${idx}" value="${escapeHtml(m.name)}">
-          </div>
-          <div class="col-6 col-md-4 col-lg-2">
-            <label class="form-label mb-1" for="${idPrefix}-atkDice">🎲 Atk dice</label>
-            <input id="${idPrefix}-atkDice" type="number" class="form-control form-control-sm" min="0" max="50" data-mk="atkDice" data-mi="${idx}" value="${m.atkDice}">
-          </div>
-          <div class="col-6 col-md-4 col-lg-2">
-            <label class="form-label mb-1" for="${idPrefix}-atkTarget">⚔️ Atk target</label>
-            <input id="${idPrefix}-atkTarget" type="number" class="form-control form-control-sm" min="2" max="6" data-mk="atkTarget" data-mi="${idx}" value="${m.atkTarget}">
-          </div>
-          <div class="col-6 col-md-4 col-lg-2">
-            <label class="form-label mb-1" for="${idPrefix}-auto">Auto dmg</label>
-            <input id="${idPrefix}-auto" type="number" class="form-control form-control-sm" min="0" max="50" data-mk="auto" data-mi="${idx}" value="${m.auto}">
-          </div>
-          <div class="col-6 col-md-4 col-lg-2">
-            <label class="form-label mb-1" for="${idPrefix}-defTarget">🛡️ Def target</label>
-            <input id="${idPrefix}-defTarget" type="number" class="form-control form-control-sm" min="2" max="6" data-mk="defTarget" data-mi="${idx}" value="${m.defTarget}">
-          </div>
-          <div class="col-6 col-md-4 col-lg-2">
-            <label class="form-label mb-1" for="${idPrefix}-maxHealth">Max HP</label>
-            <input id="${idPrefix}-maxHealth" type="number" class="form-control form-control-sm" min="1" max="999" data-mk="maxHealth" data-mi="${idx}" value="${m.maxHealth}">
-          </div>
-          <div class="col-6 col-md-4 col-lg-2">
-            <label class="form-label mb-1" for="${idPrefix}-health">HP</label>
-            <input id="${idPrefix}-health" type="number" class="form-control form-control-sm" min="0" max="999" data-mk="health" data-mi="${idx}" value="${m.health}">
-          </div>
-          <div class="col-12 col-md-auto ms-auto text-end">
-            <button class="btn btn-outline-danger btn-sm lk-icon-btn" data-del-mob="${idx}" aria-label="Remove opponent">
-              <i class="bi bi-trash" aria-hidden="true"></i>
-            </button>
+    layout.appendChild(detailArea);
+    pe.appendChild(layout);
+    renderVaultSection();
+    renderMissionNotes();
+
+    const me = $("mobEditor");
+    me.innerHTML = "";
+    state.mobs.forEach((m, idx) => {
+      const div = document.createElement("div");
+      const idPrefix = `mob-${idx}`;
+      div.className = "card mb-3 shadow-sm";
+      div.innerHTML = `
+        <div class="card-body">
+          <div class="row g-3 align-items-end">
+            <div class="col-sm-6 col-lg-4">
+              <label class="form-label mb-1" for="${idPrefix}-name">Name</label>
+              <input id="${idPrefix}-name" type="text" class="form-control form-control-sm" data-mk="name" data-mi="${idx}" value="${escapeHtml(m.name)}">
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+              <label class="form-label mb-1" for="${idPrefix}-atkDice">🎲 Atk dice</label>
+              <input id="${idPrefix}-atkDice" type="number" class="form-control form-control-sm" min="0" max="50" data-mk="atkDice" data-mi="${idx}" value="${m.atkDice}">
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+              <label class="form-label mb-1" for="${idPrefix}-atkTarget">⚔️ Atk target</label>
+              <input id="${idPrefix}-atkTarget" type="number" class="form-control form-control-sm" min="2" max="6" data-mk="atkTarget" data-mi="${idx}" value="${m.atkTarget}">
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+              <label class="form-label mb-1" for="${idPrefix}-auto">Auto dmg</label>
+              <input id="${idPrefix}-auto" type="number" class="form-control form-control-sm" min="0" max="50" data-mk="auto" data-mi="${idx}" value="${m.auto}">
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+              <label class="form-label mb-1" for="${idPrefix}-defTarget">🛡️ Def target</label>
+              <input id="${idPrefix}-defTarget" type="number" class="form-control form-control-sm" min="2" max="6" data-mk="defTarget" data-mi="${idx}" value="${m.defTarget}">
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+              <label class="form-label mb-1" for="${idPrefix}-maxHealth">Max HP</label>
+              <input id="${idPrefix}-maxHealth" type="number" class="form-control form-control-sm" min="1" max="999" data-mk="maxHealth" data-mi="${idx}" value="${m.maxHealth}">
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+              <label class="form-label mb-1" for="${idPrefix}-health">HP</label>
+              <input id="${idPrefix}-health" type="number" class="form-control form-control-sm" min="0" max="999" data-mk="health" data-mi="${idx}" value="${m.health}">
+            </div>
+            <div class="col-12 col-md-auto ms-auto text-end">
+              <button class="btn btn-outline-danger btn-sm lk-icon-btn" data-del-mob="${idx}" aria-label="Remove opponent">
+                <i class="bi bi-trash" aria-hidden="true"></i>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    `;
-    me.appendChild(div);
-  });
+      `;
+      me.appendChild(div);
+    });
 
   pe.querySelectorAll("[data-hero-tab]").forEach(el => el.addEventListener("click", (e) => {
     const i = Number(el.getAttribute("data-hero-tab"));
@@ -1529,6 +1547,57 @@ function renderEditors() {
     renderAll();
   }));
 }
+
+  function renderVaultSection() {
+    const listEl = $("vaultList");
+    const input = $("vaultInput");
+    const addBtn = $("vaultAdd");
+    state.vault = normalizeVaultItems(state.vault);
+
+    if (input) {
+      input.onkeydown = (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          addVaultItem(input.value);
+        }
+      };
+    }
+
+    if (addBtn) addBtn.onclick = () => addVaultItem(input?.value || "");
+
+    if (!listEl) return;
+
+    if (!state.vault.length) {
+      listEl.innerHTML = `<div class="lk-vault-empty">The vault is empty.</div>`;
+      return;
+    }
+
+    listEl.innerHTML = state.vault.map((entry, idx) => `
+      <div class="lk-vault-item">
+        <div class="lk-vault-name">${escapeHtml(entry)}</div>
+        <div class="lk-vault-actions">
+          <button class="btn btn-outline-danger btn-sm lk-icon-btn" data-del-vault="${idx}" aria-label="Remove item">
+            <i class="bi bi-trash" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+    `).join("");
+
+    listEl.querySelectorAll("[data-del-vault]").forEach(el => el.addEventListener("click", (e) => {
+      const idx = Number(el.getAttribute("data-del-vault"));
+      removeVaultItem(idx);
+    }));
+  }
+
+  function renderMissionNotes() {
+    const notes = $("missionNotes");
+    if (!notes) return;
+    notes.value = state.missionNotes || "";
+    notes.oninput = (e) => {
+      state.missionNotes = e.target.value || "";
+      saveSetupToStorage(state);
+    };
+  }
 
 function enforceUniquePartyNames() {
   const seen = new Set();
@@ -1636,6 +1705,25 @@ function onMobEdit(e) {
   state.battleSeed = null;
   saveSetupToStorage(state);
   renderAll();
+}
+
+function addVaultItem(raw) {
+  const text = (raw || "").trim();
+  if (!text) return;
+  state.vault.push(text);
+  state.battleSeed = null;
+  saveSetupToStorage(state);
+  const input = $("vaultInput");
+  if (input) input.value = "";
+  renderVaultSection();
+}
+
+function removeVaultItem(idx) {
+  if (!Array.isArray(state.vault) || idx < 0 || idx >= state.vault.length) return;
+  state.vault.splice(idx, 1);
+  state.battleSeed = null;
+  saveSetupToStorage(state);
+  renderVaultSection();
 }
 
 function renderTables() {
@@ -2415,11 +2503,15 @@ function initUI() {
     if (!confirm("Clear party setup and saved data?")) return;
     state.party = [];
     state.selectedPartyIndex = 0;
+    state.vault = [];
+    state.missionNotes = "";
     state.battleSeed = null;
     try {
       const raw = localStorage.getItem(LS_KEY);
       const obj = raw ? JSON.parse(raw) : {};
       obj.party = [];
+      obj.vault = [];
+      obj.missionNotes = "";
       localStorage.setItem(LS_KEY, JSON.stringify(obj));
     } catch {}
     saveSetupToStorage(state);

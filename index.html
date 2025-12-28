@@ -228,8 +228,38 @@ Successes Required: 4"></textarea>
             </div>
           </div>
               <div class="card-body">
-                <div id="partyEditor" class="lk-party-editor"></div>
+              <div id="partyEditor" class="lk-party-editor"></div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mt-3">
+          <div class="card-header d-flex align-items-center justify-content-between gap-2">
+            <h2 class="h5 mb-0">Shared resources</h2>
+            <span class="text-body-secondary small">Party-level storage &amp; notes</span>
+          </div>
+          <div class="card-body">
+            <div class="lk-shared-layout">
+              <div class="lk-vault-panel">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                  <div>
+                    <h3 class="h6 mb-0">The Vault</h3>
+                    <div class="text-body-secondary small">Store any number of shared items.</div>
+                  </div>
+                  <div class="input-group input-group-sm lk-vault-input">
+                    <input type="text" id="vaultInput" class="form-control" placeholder="Add item to the vault" aria-label="Add item to the vault">
+                    <button class="btn btn-primary" type="button" id="vaultAdd">Add</button>
+                  </div>
+                </div>
+                <div id="vaultList" class="lk-vault-list"></div>
               </div>
+
+              <div class="lk-mission-panel">
+                <label class="form-label" for="missionNotes">Mission notes</label>
+                <textarea id="missionNotes" class="form-control lk-mission-notes" rows="10" spellcheck="false" placeholder="Party-wide notes"></textarea>
+                <div class="text-body-secondary small mt-2">Saved with this party.</div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
