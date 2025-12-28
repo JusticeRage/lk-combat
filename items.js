@@ -16,6 +16,7 @@ export const ITEMS = [
   { id: "incense", name: "Incense", modifiers: {} },
   { id: "dragon_head", name: "Dragon head", modifiers: {} },
   { id: "steel_longsword", name: "Steel Longsword", modifiers: { fighting: 2 }, hands: 1, type: "weapon" },
+  { id: "vial_of_poison", name: "Vial of poison", modifiers: {} },
 ];
 
 export function getItemById(id) {

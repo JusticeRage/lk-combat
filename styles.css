@@ -12,6 +12,31 @@
   padding: .5rem .6rem;
 }
 
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .4rem .75rem;
+  border-radius: 999px;
+  border: 1px solid var(--bs-border-color);
+  background: color-mix(in oklab, var(--bs-tertiary-bg) 70%, transparent);
+  font-weight: 700;
+  letter-spacing: .01em;
+  box-shadow: 0 .25rem .75rem rgba(0,0,0,.04);
+}
+
+.stat-pill {
+  background: color-mix(in oklab, var(--bs-primary-bg-subtle) 55%, transparent);
+  border-color: color-mix(in oklab, var(--bs-primary-border-subtle) 60%, transparent);
+}
+
+.stat-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  margin-top: .35rem;
+}
+
 /* JS-rendered editor cards should have consistent spacing */
 .lk-editor > .card,
 .lk-editor > div.card {
@@ -81,6 +106,41 @@
   box-shadow: var(--lk-shadow-sm);
   overflow: clip;
   padding: 1rem;
+}
+
+.lk-party-resources {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--lk-border);
+  border-radius: var(--lk-radius);
+  background: var(--bs-body-bg);
+  box-shadow: var(--lk-shadow-sm);
+  padding: 1rem;
+}
+
+.lk-resource-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+}
+
+.lk-resource-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: .9rem;
+  background: color-mix(in oklab, var(--bs-warning-bg-subtle) 85%, transparent);
+  border: 1px solid color-mix(in oklab, var(--bs-warning-border-subtle) 60%, transparent);
+  font-size: 1.4rem;
+  box-shadow: 0 .35rem .85rem rgba(0,0,0,.06);
+}
+
+.hero-avatar {
+  border-radius: .85rem;
 }
 
 /* Headings inside a character card */
@@ -171,3 +231,64 @@
   vertical-align: middle;
 }
 #partyEditor.lk-party-grid tr:last-child td{ border-bottom: none; }
+
+.spell-card {
+  margin-top: .75rem;
+  padding: .75rem 1rem;
+  border: 1px solid var(--lk-border);
+  border-radius: var(--lk-radius);
+  background: var(--bs-tertiary-bg);
+}
+
+.spell-card summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: .01em;
+  list-style: none;
+}
+
+.spell-card summary::-webkit-details-marker { display: none; }
+
+.spell-body {
+  margin-top: .75rem;
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+
+.spell-row {
+  display: flex;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+.spell-row label { flex: 1 1 220px; }
+
+.hero-name {
+  font-weight: 700;
+  letter-spacing: .01em;
+  border-style: dashed;
+}
+
+/* Dialog fallback styling (native <dialog>) */
+.lk-dialog {
+  position: fixed;
+  border: none;
+  border-radius: 1rem;
+  padding: 0;
+  box-shadow: 0 1.5rem 3rem rgba(0,0,0,.25);
+  width: min(720px, 92vw);
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  z-index: 1080;
+}
+
+.lk-dialog::backdrop {
+  background: rgba(15, 23, 42, .55);
+}
