@@ -759,6 +759,7 @@ function renderRollDisplay(opts) {
   const lr = opts?.roll || { groups: [], totalSuccesses: 0 };
   const groups = Array.isArray(lr.groups) ? lr.groups : [];
   const hasRolls = groups.some(g => Array.isArray(g.rolls) && g.rolls.length > 0);
+  const required = Number.isFinite(opts?.requiredSuccesses) ? opts.requiredSuccesses : null;
 
   const groupHtml = groups.map(group => {
     const rolls = Array.isArray(group.rolls) ? group.rolls : [];
@@ -776,7 +777,7 @@ function renderRollDisplay(opts) {
   }).join("");
 
   if (title) title.textContent = hasRolls
-    ? `Latest roll: ${lr.totalSuccesses || 0} 💥`
+    ? (required != null ? `Latest roll: ${lr.totalSuccesses || 0}/${required} 💥` : `Latest roll: ${lr.totalSuccesses || 0} 💥`)
     : (opts?.emptyTitle || "Latest roll");
 
   wrap.innerHTML = hasRolls
@@ -1827,6 +1828,7 @@ function renderSkillRoll() {
     wrapId: "skillRollDisplay",
     titleId: "skillRollTitle",
     roll: state.skillCheck?.latestRoll,
+    requiredSuccesses: state.skillCheck?.lastResult?.required,
     emptyTitle: "Latest roll",
     emptyText: "Roll to see the dice.",
   });
@@ -1903,24 +1905,14 @@ function renderSkillCheck() {
     ? `${diceInfo.dice}d6 @ ${sc.dc}+ • Need ${sc.requiredSuccesses} successes${diceInfo.capped ? ` (capped from ${diceInfo.rawDice})` : ""}`
     : "Pick hero(s) to roll.";
 
-  note.textContent = heroes.length
-    ? heroes.map(h => `${h.name}: ${skillLabelForKey(sc.skill)} ${getSkillValueFor(h, sc.skill)}`).join(" • ")
-    : "Select party members to combine their skill dice.";
+  note.textContent = `You will roll ${diceInfo.dice} die${diceInfo.capped ? ` (capped from ${diceInfo.rawDice})` : ""}.`;
 
   rollBtn.disabled = !(heroes.length >= neededHeroes && diceInfo.dice > 0);
 
   if (sc.lastResult) {
-    const cls = sc.lastResult.success ? "alert-success" : "alert-danger";
-    const participantLabel = (sc.lastResult.participants || []).join(" + ") || "Party";
-    const capNote = sc.lastResult.capped ? ` (capped from ${sc.lastResult.rawDice})` : "";
-    outcome.innerHTML = `
-      <div class="alert ${cls} mb-0">
-        <div class="fw-semibold">${escapeHtml(sc.name || "Skill check")}</div>
-        <div>${escapeHtml(participantLabel)} rolled ${sc.lastResult.diceUsed}d6${capNote} @ ${sc.dc}+ → ${sc.lastResult.successes}/${sc.lastResult.required} successes.</div>
-        <div class="fw-semibold mt-1">${sc.lastResult.success ? "Success!" : "Failure."}</div>
-      </div>`;
+    outcome.textContent = sc.lastResult.success ? "✅ Success" : "❌ Failure";
   } else {
-    outcome.innerHTML = `<div class="text-body-secondary small">Define a check and roll to see the result.</div>`;
+    outcome.textContent = "";
   }
 
   renderSkillRoll();
@@ -1939,8 +1931,7 @@ function performSkillRoll() {
   const rolls = rollD6(diceInfo.dice);
   const successes = rolls.filter(r => r >= sc.dc).length;
   const pass = successes >= sc.requiredSuccesses;
-  const label = sc.name ? `${sc.name} (${skillLabelForKey(sc.skill)})` : skillLabelForKey(sc.skill);
-  const rollData = buildLatestRoll([{ rolls, target: sc.dc, label }]);
+  const rollData = buildLatestRoll([{ rolls, target: sc.dc, label: "" }]);
 
   state.skillCheck.latestRoll = rollData;
   state.skillCheck.lastResult = {
@@ -2337,12 +2328,19 @@ function initUI() {
   });
   $("skillImportBtn").addEventListener("click", () => {
     $("skillImportError").style.display = "none";
+    $("skillImportError").textContent = "";
+    $("skillImportText").value = "";
+    bsModalShow("skillImportDialog");
+  });
+  $("skillImportCancel").addEventListener("click", () => bsModalHide("skillImportDialog"));
+  $("skillImportOk").addEventListener("click", () => {
     try {
       const parsed = parseSkillCheckImport($("skillImportText").value || "");
       parsed.latestRoll = { groups: [], totalSuccesses: 0 };
       parsed.lastResult = null;
       state.skillCheck = parsed;
       saveSetupToStorage(state);
+      bsModalHide("skillImportDialog");
       renderSkillCheck();
     } catch (e) {
       $("skillImportError").textContent = String(e?.message || e);
