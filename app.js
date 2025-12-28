@@ -152,11 +152,11 @@ function ensureStatsModalExists() {
               <input type="number" min="0" max="50" id="statArmour" class="form-control">
             </div>
             <div class="col-12 col-md-6">
-              <label class="form-label small text-secondary mb-1" for="statMaxHp">❤️ Max HP</label>
+              <label class="form-label small text-secondary mb-1" for="statMaxHp">Max HP</label>
               <input type="number" min="1" max="999" id="statMaxHp" class="form-control">
             </div>
             <div class="col-12 col-md-6">
-              <label class="form-label small text-secondary mb-1" for="statHp">❤️ HP</label>
+              <label class="form-label small text-secondary mb-1" for="statHp">HP</label>
               <input type="number" min="0" max="999" id="statHp" class="form-control">
             </div>
           </div>
@@ -359,7 +359,6 @@ function renderHpBlock(entity) {
   return `
     <div class="lk-hp" aria-label="Hit points">
       <div class="lk-hp-head">
-        <span class="lk-hp-title">❤️ HP</span>
         <span class="lk-hp-num">${current}/${max}</span>
       </div>
       <div class="progress" role="progressbar" aria-valuenow="${current}" aria-valuemin="0" aria-valuemax="${max}">
@@ -377,7 +376,6 @@ function renderPortraitHp(hero) {
   return `
     <div class="lk-portrait-hp" aria-label="Hit points">
       <div class="lk-portrait-hp-head">
-        <span class="lk-portrait-hp-title">❤️ HP</span>
         <span class="lk-portrait-hp-num">${current}/${max}</span>
       </div>
       <div class="progress" role="progressbar" aria-valuenow="${current}" aria-valuemin="0" aria-valuemax="${max}">
@@ -593,21 +591,36 @@ const state = {
   selectedPartyIndex: 0,
   codes: createEmptyCodes(),
   selectedCodeBook: CODE_BOOKS[0]?.key || "A",
-  latestRoll: { rolls: [], successes: 0, successMask: [] },
+  latestRoll: { groups: [], totalSuccesses: 0 },
 };
 
-function recordLatestRoll({ rolls, target, successPredicate }) {
-  if (!Array.isArray(rolls)) {
-    state.latestRoll = { rolls: [], successes: 0, successMask: [] };
-    return;
-  }
+function buildLatestRoll(groups) {
+  const norm = Array.isArray(groups) ? groups : [];
+  const built = norm.map(entry => {
+    const rolls = Array.isArray(entry?.rolls) ? entry.rolls : [];
+    const successMask = rolls.map(r => entry?.successPredicate
+      ? entry.successPredicate(r)
+      : (entry?.target != null ? r >= entry.target : false));
+    return {
+      rolls: [...rolls],
+      successes: successMask.filter(Boolean).length,
+      successMask,
+      label: entry?.label ? String(entry.label) : "",
+    };
+  });
 
-  const successMask = rolls.map(r => successPredicate ? successPredicate(r) : (target != null ? r >= target : false));
-  state.latestRoll = {
-    rolls: [...rolls],
-    successes: successMask.filter(Boolean).length,
-    successMask,
+  return {
+    groups: built,
+    totalSuccesses: built.reduce((sum, g) => sum + (g.successes || 0), 0),
   };
+}
+
+function recordLatestRoll(entry) {
+  state.latestRoll = buildLatestRoll([entry]);
+}
+
+function recordLatestRollGroups(groups) {
+  state.latestRoll = buildLatestRoll(groups);
 }
 
 function pushLog(line) {
@@ -625,22 +638,28 @@ function renderLatestRoll() {
   const wrap = $("latestRoll");
   const title = $("latestRollTitle");
   if (!wrap || !title) return;
-  const lr = state.latestRoll || { rolls: [], successes: 0, successMask: [] };
-  const rolls = Array.isArray(lr.rolls) ? lr.rolls : [];
-  const successes = Number(lr.successes) || 0;
-  const mask = Array.isArray(lr.successMask) ? lr.successMask : [];
-  const hasRolls = rolls.length > 0;
+  const lr = state.latestRoll || { groups: [], totalSuccesses: 0 };
+  const groups = Array.isArray(lr.groups) ? lr.groups : [];
+  const hasRolls = groups.some(g => Array.isArray(g.rolls) && g.rolls.length > 0);
 
-  const diceHtml = rolls.map((r, idx) => {
-    const face = Math.min(6, Math.max(1, Number(r) || 1));
-    const isSuccess = !!mask[idx];
-    const cls = `lk-die${isSuccess ? " is-success" : ""}`;
-    return `<div class="${cls}"><img src="./img/dice_${face}.svg" alt="Die showing ${face}"></div>`;
+  const groupHtml = groups.map(group => {
+    const rolls = Array.isArray(group.rolls) ? group.rolls : [];
+    const mask = Array.isArray(group.successMask) ? group.successMask : [];
+    const diceHtml = rolls.map((r, idx) => {
+      const face = Math.min(6, Math.max(1, Number(r) || 1));
+      const isSuccess = !!mask[idx];
+      const cls = `lk-die${isSuccess ? " is-success" : ""}`;
+      return `<div class="${cls}"><img src="./img/dice_${face}.svg" alt="Die showing ${face}"></div>`;
+    }).join("");
+
+    const label = group.label ? `<div class="lk-roll-label">${escapeHtml(group.label)}</div>` : "";
+
+    return `<div class="lk-roll-group">${label}<div class="lk-dice-row">${diceHtml}</div></div>`;
   }).join("");
 
-  title.textContent = hasRolls ? `Latest roll: ${successes} 💥` : "Latest roll";
+  title.textContent = hasRolls ? `Latest roll: ${lr.totalSuccesses || 0} 💥` : "Latest roll";
   wrap.innerHTML = hasRolls
-    ? `<div class="lk-dice-row">${diceHtml}</div>`
+    ? groupHtml
     : `<div class="text-body-secondary small">No rolls yet.</div>`;
 }
 
@@ -667,7 +686,7 @@ function undo() {
   state.log = last.log;
   state.battleSeed = last.battleSeed;
   state.selectedPartyIndex = Number.isInteger(last.selectedPartyIndex) ? last.selectedPartyIndex : 0;
-  state.latestRoll = last.latestRoll || { rolls: [], successes: 0, successMask: [] };
+  state.latestRoll = last.latestRoll || { groups: [], totalSuccesses: 0 };
   clampSelectedPartyIndex();
   renderAll();
 }
@@ -764,7 +783,7 @@ function restoreFromSeed() {
   clampSelectedPartyIndex();
   state.mobs = deepClone(state.battleSeed.mobs).map(m => ({ ...m, dead: false, health: m.maxHealth }));
   state.log = [];
-  state.latestRoll = { rolls: [], successes: 0, successMask: [] };
+  state.latestRoll = { groups: [], totalSuccesses: 0 };
   pushLog(`=== Combat restarted (${nowStamp()}) ===`);
   pushLog(`--- Round 1 (Party turn) ---`);
   return true;
@@ -847,7 +866,6 @@ function resolveOneEnemyAttack(victimIdx) {
   snapshot();
 
   const { rolls, hits } = computeEnemyHits(mob.atkDice, mob.atkTarget);
-  recordLatestRoll({ rolls, target: mob.atkTarget });
   const auto = mob.auto || 0;
   const raw = hits + auto;
 
@@ -856,7 +874,10 @@ function resolveOneEnemyAttack(victimIdx) {
   if (raw > 0) {
     const effArmour = getEffectiveArmourScore(victim);
     const save = armourSaveRolls(effArmour, raw);
-    recordLatestRoll({ rolls: save.rolls, target: 4 });
+    recordLatestRollGroups([
+      { rolls, target: mob.atkTarget, label: `${mob.name} attack` },
+      { rolls: save.rolls, target: 4, label: `${victim.name} armour save` },
+    ]);
     const final = Math.max(0, raw - save.saved);
 
     if (save.rolls.length) {
@@ -1279,11 +1300,11 @@ function renderEditors() {
             <input id="${idPrefix}-defTarget" type="number" class="form-control form-control-sm" min="2" max="6" data-mk="defTarget" data-mi="${idx}" value="${m.defTarget}">
           </div>
           <div class="col-6 col-md-4 col-lg-2">
-            <label class="form-label mb-1" for="${idPrefix}-maxHealth">❤️ Max HP</label>
+            <label class="form-label mb-1" for="${idPrefix}-maxHealth">Max HP</label>
             <input id="${idPrefix}-maxHealth" type="number" class="form-control form-control-sm" min="1" max="999" data-mk="maxHealth" data-mi="${idx}" value="${m.maxHealth}">
           </div>
           <div class="col-6 col-md-4 col-lg-2">
-            <label class="form-label mb-1" for="${idPrefix}-health">❤️ HP</label>
+            <label class="form-label mb-1" for="${idPrefix}-health">HP</label>
             <input id="${idPrefix}-health" type="number" class="form-control form-control-sm" min="0" max="999" data-mk="health" data-mi="${idx}" value="${m.health}">
           </div>
           <div class="col-12 col-md-auto ms-auto text-end">
@@ -1487,7 +1508,7 @@ function renderTables() {
     }).join("");
     pt.innerHTML = `
       <table class="table align-middle mb-0">
-        <thead><tr><th>Hero</th><th>⚔️ Fight</th><th>🛡️ Arm</th><th>❤️ HP</th></tr></thead>
+        <thead><tr><th>Hero</th><th>⚔️ Fight</th><th>🛡️ Arm</th><th>HP</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
@@ -1508,7 +1529,7 @@ function renderTables() {
     `).join("");
     mt.innerHTML = `
       <table class="table align-middle mb-0">
-        <thead><tr><th>Name</th><th>Attack</th><th>🛡️ Def</th><th>❤️ HP</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Attack</th><th>🛡️ Def</th><th>HP</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
@@ -1939,7 +1960,7 @@ function startOrRestartCombat() {
   state.round = 1;
   state.turn = "party";
   state.enemyIndex = 0;
-  state.latestRoll = { rolls: [], successes: 0, successMask: [] };
+  state.latestRoll = { groups: [], totalSuccesses: 0 };
 
   normalizeForCombat();
   clearBattleBuffs(state.party);
