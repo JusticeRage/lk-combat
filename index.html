@@ -131,6 +131,33 @@
       </div>
     </div>
 
+    <!-- Skill check import -->
+    <div class="modal fade" id="skillImportDialog" tabindex="-1" aria-labelledby="skillImportDialogLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5 mb-0" id="skillImportDialogLabel">Import skill check</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="text-body-secondary small mb-2">
+              Matches the rulebook format shown on the right.
+            </div>
+            <label class="form-label" for="skillImportText">Import from plaintext</label>
+            <textarea id="skillImportText" class="form-control lk-textarea" rows="7"
+                      spellcheck="false" placeholder="Sneak past the goblin (Team check)
+Skill and DC: Stealth (4+)
+Successes Required: 4"></textarea>
+            <div id="skillImportError" class="invalid-feedback d-block" style="display:none;"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" id="skillImportCancel" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="skillImportOk">Import (replace skill check)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Spell cast dialog -->
     <div class="modal fade" id="spellDialog" tabindex="-1" aria-labelledby="spellDialogLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -378,13 +405,11 @@
                   </div>
 
                   <div class="col-md-6">
-                    <label class="form-label" for="skillImportText">Import from plaintext</label>
-                    <textarea id="skillImportText" class="form-control lk-textarea" rows="7"
-                              spellcheck="false" placeholder="Sneak past the goblin (Team check)
-Skill and DC: Stealth (4+)
-Successes Required: 4"></textarea>
-                    <div id="skillImportError" class="invalid-feedback d-block" style="display:none;"></div>
-                    <div class="text-body-secondary small mt-1">Matches the rulebook format shown on the right.</div>
+                    <div class="lk-hint h-100">
+                      <div class="fw-semibold mb-1">Need to import?</div>
+                      <div class="text-body-secondary small mb-0">Use the "Import from text" button to paste a skill check from the
+                        rulebook format.</div>
+                    </div>
                   </div>
                 </div>
               </div>
