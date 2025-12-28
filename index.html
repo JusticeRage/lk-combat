@@ -29,126 +29,138 @@
     </header>
 
     <!-- Hero picker -->
-    <dialog id="heroDialog" class="lk-dialog">
-      <form method="dialog" class="lk-dialog__card">
-        <div class="lk-dialog__header">
-          <h2 class="h5 mb-0">Choose hero</h2>
+    <div class="modal fade" id="heroDialog" tabindex="-1" aria-labelledby="heroDialogLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5" id="heroDialogLabel">Add party member</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <label class="form-label" for="heroNameSelect">Hero</label>
+            <select id="heroNameSelect" class="form-select"></select>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" id="heroCancel" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="heroOk">Add</button>
+          </div>
         </div>
-        <div class="lk-dialog__body">
-          <label class="form-label">Hero</label>
-          <select id="heroNameSelect" class="form-select"></select>
-        </div>
-        <div class="lk-dialog__footer">
-          <button class="btn btn-outline-secondary" id="heroCancel" value="cancel">Cancel</button>
-          <button class="btn btn-primary" id="heroOk" value="ok">Add</button>
-        </div>
-      </form>
-    </dialog>
+      </div>
+    </div>
 
     <!-- Stats editor -->
-    <dialog id="statsDialog" class="lk-dialog">
-      <form method="dialog" class="lk-dialog__card">
-        <div class="lk-dialog__header">
-          <div class="d-flex align-items-center justify-content-between gap-2">
-            <h2 class="h5 mb-0">Edit hero stats</h2>
-            <div id="statsDialogHero" class="text-body-secondary small text-truncate"></div>
+    <div class="modal fade" id="statsDialog" tabindex="-1" aria-labelledby="statsDialogLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div class="d-flex align-items-center justify-content-between gap-2">
+              <h2 class="modal-title h5 mb-0" id="statsDialogLabel">Edit hero stats</h2>
+              <div id="statsDialogHero" class="text-body-secondary small text-truncate"></div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label" for="statFighting">⚔️ Fighting</label>
+                <input type="number" min="0" max="50" id="statFighting" class="form-control">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="statStealth">🥷🏻 Stealth</label>
+                <input type="number" min="0" max="50" id="statStealth" class="form-control">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="statLore">📚 Lore</label>
+                <input type="number" min="0" max="50" id="statLore" class="form-control">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="statSurvival">🏕️ Survival</label>
+                <input type="number" min="0" max="50" id="statSurvival" class="form-control">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="statCharisma">💬 Charisma</label>
+                <input type="number" min="0" max="50" id="statCharisma" class="form-control">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="statArmour">🛡️ Armour</label>
+                <input type="number" min="0" max="50" id="statArmour" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="statMaxHp">Max HP</label>
+                <input type="number" min="1" max="999" id="statMaxHp" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="statHp">HP</label>
+                <input type="number" min="0" max="999" id="statHp" class="form-control">
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" id="statsCancel" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="statsSave">Save</button>
           </div>
         </div>
-        <div class="lk-dialog__body">
-          <div class="row g-3">
-            <div class="col-md-4">
-              <label class="form-label">⚔️ Fighting</label>
-              <input type="number" min="0" max="50" id="statFighting" class="form-control">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">🥷🏻 Stealth</label>
-              <input type="number" min="0" max="50" id="statStealth" class="form-control">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">📚 Lore</label>
-              <input type="number" min="0" max="50" id="statLore" class="form-control">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">🏕️ Survival</label>
-              <input type="number" min="0" max="50" id="statSurvival" class="form-control">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">💬 Charisma</label>
-              <input type="number" min="0" max="50" id="statCharisma" class="form-control">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">🛡️ Armour</label>
-              <input type="number" min="0" max="50" id="statArmour" class="form-control">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Max HP</label>
-              <input type="number" min="1" max="999" id="statMaxHp" class="form-control">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">HP</label>
-              <input type="number" min="0" max="999" id="statHp" class="form-control">
-            </div>
-          </div>
-        </div>
-        <div class="lk-dialog__footer">
-          <button class="btn btn-outline-secondary" id="statsCancel" value="cancel">Cancel</button>
-          <button class="btn btn-primary" id="statsSave" value="ok">Save</button>
-        </div>
-      </form>
-    </dialog>
+      </div>
+    </div>
 
     <!-- Encounter import -->
-    <dialog id="importDialog" class="lk-dialog">
-      <form method="dialog" class="lk-dialog__card">
-        <div class="lk-dialog__header">
-          <h2 class="h5 mb-0">Import encounter (opponents)</h2>
-        </div>
-        <div class="lk-dialog__body">
-          <div class="text-body-secondary small mb-2">
-            Blocks like:<br />
-            <span class="lk-pill">1st Storm Priest</span><br />
-            <span class="lk-pill">3 (4+)</span><br />
-            <span class="lk-pill">4+</span><br />
-            <span class="lk-pill">13</span><br />
-            Optional: <span class="lk-pill">+2 Auto</span> on the attack line (e.g. <span class="lk-pill">7 (3+) +2 Auto</span>)
+    <div class="modal fade" id="importDialog" tabindex="-1" aria-labelledby="importDialogLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5 mb-0" id="importDialogLabel">Import encounter (opponents)</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
-          <textarea id="importText" spellcheck="false" class="form-control lk-textarea" rows="10"></textarea>
-          <div id="importError" class="invalid-feedback d-block" style="display:none;"></div>
+          <div class="modal-body">
+            <div class="text-body-secondary small mb-2">
+              Blocks like:<br />
+              <span class="lk-pill">1st Storm Priest</span><br />
+              <span class="lk-pill">3 (4+)</span><br />
+              <span class="lk-pill">4+</span><br />
+              <span class="lk-pill">13</span><br />
+              Optional: <span class="lk-pill">+2 Auto</span> on the attack line (e.g. <span class="lk-pill">7 (3+) +2 Auto</span>)
+            </div>
+            <textarea id="importText" spellcheck="false" class="form-control lk-textarea" rows="10"></textarea>
+            <div id="importError" class="invalid-feedback d-block" style="display:none;"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" id="importCancel" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="importOk">Import (replace opponents)</button>
+          </div>
         </div>
-        <div class="lk-dialog__footer">
-          <button class="btn btn-outline-secondary" id="importCancel" value="cancel">Cancel</button>
-          <button class="btn btn-primary" id="importOk" value="ok">Import (replace opponents)</button>
-        </div>
-      </form>
-    </dialog>
+      </div>
+    </div>
 
     <!-- Spell cast dialog -->
-    <dialog id="spellDialog" class="lk-dialog">
-      <form method="dialog" class="lk-dialog__card">
-        <div class="lk-dialog__header">
-          <h2 class="h5 mb-0">Cast spell</h2>
-        </div>
-        <div class="lk-dialog__body">
-          <div class="row g-3">
-            <div class="col-sm-6">
-              <label class="form-label">Caster</label>
-              <select id="spellCaster" class="form-select"></select>
-            </div>
-            <div class="col-sm-6">
-              <label class="form-label">Spell</label>
-              <select id="spellSelect" class="form-select"></select>
-            </div>
+    <div class="modal fade" id="spellDialog" tabindex="-1" aria-labelledby="spellDialogLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5 mb-0" id="spellDialogLabel">Cast spell</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-sm-6">
+                <label class="form-label" for="spellCaster">Caster</label>
+                <select id="spellCaster" class="form-select"></select>
+              </div>
+              <div class="col-sm-6">
+                <label class="form-label" for="spellSelect">Spell</label>
+                <select id="spellSelect" class="form-select"></select>
+              </div>
+            </div>
 
-          <div id="spellTargetArea" class="card mt-3"></div>
-          <div id="spellError" class="invalid-feedback d-block" style="display:none; margin-top:.5rem;"></div>
+            <div id="spellTargetArea" class="card mt-3"></div>
+            <div id="spellError" class="invalid-feedback d-block" style="display:none; margin-top:.5rem;"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" id="spellCancel" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="spellOk">Cast</button>
+          </div>
         </div>
-        <div class="lk-dialog__footer">
-          <button class="btn btn-outline-secondary" id="spellCancel" value="cancel">Cancel</button>
-          <button class="btn btn-primary" id="spellOk" value="ok">Cast</button>
-        </div>
-      </form>
-    </dialog>
+      </div>
+    </div>
 
     <!-- Tabs -->
     <ul class="nav nav-tabs mb-3" id="lkTabs" role="tablist">
