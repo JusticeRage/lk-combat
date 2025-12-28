@@ -833,6 +833,9 @@ function castSpell({ casterIdx, spellId, targets }) {
 // --- UI rendering ---
 function renderEditors() {
   const pe = $("partyEditor");
+  const openSpellCards = new Set(
+    Array.from(pe.querySelectorAll(".spell-card[open]")).map(el => el.getAttribute("data-hero") || "")
+  );
   pe.innerHTML = "";
   const addMemberBtn = $("addMember");
   if (addMemberBtn) addMemberBtn.disabled = state.party.length >= 4;
@@ -866,7 +869,7 @@ function renderEditors() {
 
   state.party.forEach((p, idx) => {
     const div = document.createElement("div");
-    div.className = "panel panel-default hero-card";
+    div.className = "panel panel-default hero-card party-card";
     enforceWeaponHandLimit(p);
     const equipment = normalizeEquipmentList(p.equipment, { keepEmpty: true });
     const statBadges = (() => {
@@ -885,26 +888,26 @@ function renderEditors() {
       const itemLabel = escapeHtml(item?.name || eq.custom || "");
       return `
       <div class="equip-row">
-        <div class="row g-3 align-items-end">
+        <div class="row g-3 align-items-center">
           <div class="col-md-6">
             <label class="form-label small">Item</label>
             <input type="text" class="form-control form-control-sm" list="itemOptions" data-k="equipment" data-field="name" data-ei="${slot}" data-i="${idx}" value="${itemLabel}" placeholder="Item name">
           </div>
           ${item?.countable ? `
-            <div class="col-md-2">
+            <div class="col-sm-6 col-md-2">
               <label class="form-label small">Count</label>
               <input type="number" class="form-control form-control-sm" min="1" max="999" data-k="equipment" data-field="count" data-ei="${slot}" data-i="${idx}" value="${eq.count || 1}">
             </div>
           ` : ""}
           ${isWeapon ? `
-            <div class="col-md-2">
-              <div class="form-check">
+            <div class="col-sm-6 col-md-2">
+              <div class="form-check mb-0">
                 <input class="form-check-input" type="checkbox" data-k="equipment" data-field="equipped" data-ei="${slot}" data-i="${idx}" ${eq.equipped ? "checked" : ""} id="equip-${idx}-${slot}">
                 <label class="form-check-label small" for="equip-${idx}-${slot}">Equipped</label>
               </div>
             </div>
           ` : ""}
-          <div class="col-md-2 text-end">
+          <div class="col-sm-6 col-md-2 text-end">
             <button class="btn btn-outline-danger btn-sm" data-del-equipment="${slot}" data-i="${idx}">Remove</button>
           </div>
         </div>
@@ -950,17 +953,12 @@ function renderEditors() {
       <div class="panel-body">
         <div class="hero-heading">
           <img src="${getHeroImage(p.name)}" alt="${escapeHtml(p.name)} portrait" class="hero-avatar">
-          <div style="flex:1;">
-            <div class="row hero-top-row">
-              <div class="col-sm-6">
-                <label class="form-label">Name</label>
-                <div class="form-control form-control-sm bg-body-secondary hero-name" aria-label="Character name">${escapeHtml(p.name)}</div>
-              </div>
-              <div class="col-sm-6">
-                <div class="d-flex justify-content-end gap-2 flex-wrap">
-                  <button class="btn btn-outline-secondary btn-sm" data-edit-stats="${idx}">Edit stats</button>
-                  <button class="btn btn-default btn-sm" data-del-party="${idx}">Remove</button>
-                </div>
+          <div class="hero-meta">
+            <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 hero-meta__row">
+              <div class="hero-name" aria-label="Character name">${escapeHtml(p.name)}</div>
+              <div class="d-flex justify-content-end gap-2 flex-wrap">
+                <button class="btn btn-outline-secondary btn-sm" data-edit-stats="${idx}">Edit stats</button>
+                <button class="btn btn-default btn-sm" data-del-party="${idx}">Remove</button>
               </div>
             </div>
             <div class="stat-summary">${statBadges}</div>
@@ -976,7 +974,7 @@ function renderEditors() {
           </label>
         </div>
         ${isSpellcaster(p.name) ? `
-          <details class="spell-card">
+          <details class="spell-card" data-hero="${escapeHtml(p.name)}" ${openSpellCards.has(p.name) ? "open" : ""}>
             <summary>
               <span>Spells</span>
               <span class="spell-count text-secondary small">${spellRows.length} slots</span>
