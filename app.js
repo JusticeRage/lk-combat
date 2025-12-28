@@ -363,7 +363,7 @@ function renderHpBlock(entity) {
         <span class="lk-hp-num">${current}/${max}</span>
       </div>
       <div class="progress" role="progressbar" aria-valuenow="${current}" aria-valuemin="0" aria-valuemax="${max}">
-        <div class="progress-bar ${hpClass}" style="width:${pct}%"></div>
+        <div class="progress-bar${hpClass ? ` ${hpClass}` : ""}" style="width:${pct}%"></div>
       </div>
     </div>
   `;
@@ -381,7 +381,7 @@ function renderPortraitHp(hero) {
         <span class="lk-portrait-hp-num">${current}/${max}</span>
       </div>
       <div class="progress" role="progressbar" aria-valuenow="${current}" aria-valuemin="0" aria-valuemax="${max}">
-        <div class="progress-bar ${hpClass}" style="width:${pct}%"></div>
+        <div class="progress-bar${hpClass ? ` ${hpClass}` : ""}" style="width:${pct}%"></div>
       </div>
     </div>
   `;
@@ -390,7 +390,7 @@ function renderPortraitHp(hero) {
 function getHpBarClass(pct) {
   if (pct < 25) return "bg-danger";
   if (pct < 50) return "bg-warning";
-  return "bg-success";
+  return "";
 }
 
 function renderStatGrid(hero) {
