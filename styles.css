@@ -35,7 +35,14 @@
   min-width: 180px;
 }
 
-.lk-hp-head { display: flex; align-items: center; justify-content: flex-end; }
+.lk-hp-head { display: flex; align-items: center; justify-content: space-between; }
+
+.lk-hp-title {
+  font-size: .8rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+}
 
 .lk-hp-num {
   font-weight: 700;
@@ -377,7 +384,13 @@
   gap: .25rem;
 }
 
-.lk-portrait-hp-head { display: flex; align-items: center; justify-content: flex-end; gap: .5rem; }
+.lk-portrait-hp-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.lk-portrait-hp-title {
+  font-size: .75rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+}
 
 .lk-portrait-hp-num {
   font-weight: 700;

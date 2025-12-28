@@ -359,6 +359,7 @@ function renderHpBlock(entity) {
   return `
     <div class="lk-hp" aria-label="Hit points">
       <div class="lk-hp-head">
+        <span class="lk-hp-title">HP</span>
         <span class="lk-hp-num">${current}/${max}</span>
       </div>
       <div class="progress" role="progressbar" aria-valuenow="${current}" aria-valuemin="0" aria-valuemax="${max}">
@@ -376,6 +377,7 @@ function renderPortraitHp(hero) {
   return `
     <div class="lk-portrait-hp" aria-label="Hit points">
       <div class="lk-portrait-hp-head">
+        <span class="lk-portrait-hp-title">HP</span>
         <span class="lk-portrait-hp-num">${current}/${max}</span>
       </div>
       <div class="progress" role="progressbar" aria-valuenow="${current}" aria-valuemin="0" aria-valuemax="${max}">
@@ -1508,7 +1510,7 @@ function renderTables() {
     }).join("");
     pt.innerHTML = `
       <table class="table align-middle mb-0">
-        <thead><tr><th>Hero</th><th>⚔️ Fight</th><th>🛡️ Arm</th><th>HP</th></tr></thead>
+        <thead><tr><th>Hero</th><th>⚔️ Fight</th><th>🛡️ Arm</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
@@ -1529,7 +1531,7 @@ function renderTables() {
     `).join("");
     mt.innerHTML = `
       <table class="table align-middle mb-0">
-        <thead><tr><th>Name</th><th>Attack</th><th>🛡️ Def</th><th>HP</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Attack</th><th>🛡️ Def</th><th></th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
