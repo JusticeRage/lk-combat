@@ -455,6 +455,15 @@
 
 .lk-empty-sheet { border: 1px dashed var(--bs-border-color); border-radius: 1rem; padding: 1.5rem; text-align: center; color: var(--bs-secondary-color); }
 
+.lk-army-list { display: flex; flex-direction: column; gap: .75rem; }
+.lk-army-row {
+  border: 1px solid var(--bs-border-color);
+  border-radius: .85rem;
+  padding: 1rem;
+  background: color-mix(in oklab, var(--bs-body-bg) 82%, var(--bs-tertiary-bg) 18%);
+}
+.lk-army-row .form-label { margin-bottom: .35rem; }
+
 @media (max-width: 991.98px) {
   .lk-party-shell { grid-template-columns: 1fr; }
   .lk-portrait-rail { flex-direction: row; flex-wrap: wrap; }

@@ -188,6 +188,31 @@ Successes Required: 4"></textarea>
       </div>
     </div>
 
+    <!-- Army import -->
+    <div class="modal fade" id="armyImportDialog" tabindex="-1" aria-labelledby="armyImportDialogLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5 mb-0" id="armyImportDialogLabel">Import armies</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="text-body-secondary small mb-2">
+              One unit per line. Example:<br />
+              <span class="lk-pill">Luutanesh Spears – Strength 3, Morale 3</span>
+            </div>
+            <textarea id="armyImportText" class="form-control lk-textarea" rows="8" spellcheck="false"
+                      placeholder="Luutanesh Spears – Strength 3, Morale 3&#10;Faithful Irregulars – Strength 1, Morale 4"></textarea>
+            <div id="armyImportError" class="invalid-feedback d-block" style="display:none;"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" id="armyImportCancel" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="armyImportOk">Import armies</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Tabs -->
     <ul class="nav nav-tabs mb-3" id="lkTabs" role="tablist">
       <li class="nav-item" role="presentation">
@@ -206,6 +231,12 @@ Successes Required: 4"></textarea>
         <button class="nav-link" id="skillTabBtn" data-bs-toggle="tab" data-bs-target="#skillTab"
                 type="button" role="tab" aria-controls="skillTab" aria-selected="false">
           Skill check
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="armiesTabBtn" data-bs-toggle="tab" data-bs-target="#armiesTab"
+                type="button" role="tab" aria-controls="armiesTab" aria-selected="false">
+          Armies &amp; Fleet
         </button>
       </li>
       <li class="nav-item" role="presentation">
@@ -472,6 +503,25 @@ Successes Required: 4"></textarea>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Armies & Fleet -->
+      <section id="armiesTab" class="tab-pane fade" role="tabpanel" aria-labelledby="armiesTabBtn" tabindex="0">
+        <div class="card shadow-sm">
+          <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <div>
+              <h2 class="h5 mb-0">Armies &amp; Fleet</h2>
+              <div class="text-body-secondary small">List and import armies.</div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap justify-content-end">
+              <button class="btn btn-outline-primary btn-sm" id="importArmies" type="button">Import armies</button>
+              <button class="btn btn-primary btn-sm" id="addArmy" type="button">Add army</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="armyList" class="lk-army-list"></div>
           </div>
         </div>
       </section>
