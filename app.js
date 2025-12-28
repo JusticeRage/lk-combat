@@ -256,6 +256,32 @@ const formatSpellOptionLabel = (spell) => {
   return `${spell.name} (${typeLabel} • Recharge ${spell.recharge})`;
 };
 
+function summarizeSpellEffect(spell) {
+  if (!spell?.steps?.length) return "No spell effect details available.";
+  const describeStep = (step) => {
+    if (!step || typeof step !== "object") return "Mystical energies swirl.";
+    if (step.type === "attackFixed") {
+      const times = clampInt(step.times, 1, 99, 1);
+      const attacks = times === 1 ? "an attack" : `${times} attacks`;
+      const targetNote = step.mustBeDifferentTargets ? " at different targets" : "";
+      return `Make ${attacks} at Fighting ${step.fighting || 0}${targetNote}.`;
+    }
+    if (step.type === "damageFixed") {
+      const bypass = step.bypassDefence ? " (ignores defence)" : "";
+      return `Deal ${step.amount || 0} damage${bypass}.`;
+    }
+    if (step.type === "buffArmour") {
+      const duration = step.duration === "battle" ? " for this battle" : "";
+      return `Grant +${step.amount || 0} Armour${duration}.`;
+    }
+    if (step.type === "healFixed") {
+      return `Heal ${step.amount || 0} HP.`;
+    }
+    return "A strange magical effect occurs.";
+  };
+  return spell.steps.map(describeStep).join(" ");
+}
+
 const isSpellcaster = (name) => SPELLCASTER_NAMES.has(name);
 
 const getHeroImage = (name) => HERO_IMAGES[name] || "https://via.placeholder.com/120x120?text=Hero";
@@ -1667,6 +1693,29 @@ function renderTables() {
   }
 }
 
+function updatePlayerActionControls() {
+  const pa = $("playerAttacker");
+  const inCombat = state.phase === "combat";
+  const partyTurn = inCombat && state.turn === "party";
+
+  const canPartyAct = partyTurn &&
+    state.party.some(p => !p.dead && p.health > 0 && !p.actedThisRound) &&
+    livingMobs().length > 0;
+
+  const selectedAttacker = state.party[Number(pa?.value)];
+  const selectedIsCaster = !!selectedAttacker && isSpellcaster(selectedAttacker.name);
+  const canCastSelected = partyTurn && !!selectedAttacker &&
+    !selectedAttacker.dead && selectedAttacker.health > 0 && !selectedAttacker.actedThisRound &&
+    selectedIsCaster && livingMobs().length > 0;
+
+  if ($("playerAttack")) $("playerAttack").disabled = !canPartyAct;
+  if ($("playerSpell")) {
+    $("playerSpell").style.display = selectedIsCaster ? "" : "none";
+    $("playerSpell").disabled = !canCastSelected;
+  }
+  if ($("playerSkip")) $("playerSkip").disabled = !partyTurn;
+}
+
 function renderControls() {
   $("phasePill").textContent = `Phase: ${state.phase}`;
   $("roundPill").textContent = `Round: ${state.round}`;
@@ -1716,20 +1765,7 @@ function renderControls() {
     pt.appendChild(opt);
   }
 
-  const canPartyAct = partyTurn &&
-    state.party.some(p => !p.dead && p.health > 0 && !p.actedThisRound) &&
-    livingMobs().length > 0;
-
-  const selectedAttacker = state.party[Number(pa.value)];
-  const selectedIsCaster = !!selectedAttacker && isSpellcaster(selectedAttacker.name);
-  const canCastSelected = partyTurn && !!selectedAttacker &&
-    !selectedAttacker.dead && selectedAttacker.health > 0 && !selectedAttacker.actedThisRound &&
-    selectedIsCaster && livingMobs().length > 0;
-
-  $("playerAttack").disabled = !canPartyAct;
-  $("playerSpell").style.display = selectedIsCaster ? "" : "none";
-  $("playerSpell").disabled = !canCastSelected;
-  $("playerSkip").disabled = !partyTurn;
+  updatePlayerActionControls();
 
   // enemy controls
   const ec = $("enemyCurrent");
@@ -2054,25 +2090,25 @@ function openSpellDialog() {
 
   // spells list: disable if used by selected caster (updated on change)
   const spellSel = $("spellSelect");
-    const renderSpellOptions = () => {
-      spellSel.innerHTML = "";
-      const cidx = Number(casterSel.value);
-      const caster = state.party[cidx];
-      const known = caster?.spells?.filter(s => {
-        if (!s.id) return false;
-        const sp = getSpellById(s.id);
-        return sp?.type === "combat";
-      }) || [];
+  const renderSpellOptions = () => {
+    spellSel.innerHTML = "";
+    const cidx = Number(casterSel.value);
+    const caster = state.party[cidx];
+    const known = caster?.spells?.filter(s => {
+      if (!s.id) return false;
+      const sp = getSpellById(s.id);
+      return sp?.type === "combat";
+    }) || [];
 
-      if (!known.length) {
-        const opt = document.createElement("option");
-        opt.value = "";
-        opt.textContent = "No combat spells prepared";
-        opt.disabled = true;
-        spellSel.appendChild(opt);
-        spellSel.disabled = true;
+    if (!known.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "No combat spells prepared";
+      opt.disabled = true;
+      spellSel.appendChild(opt);
+      spellSel.disabled = true;
       const area = $("spellTargetArea");
-      area.innerHTML = `<div class="text-body-secondary">${caster ? "No prepared spells for this caster." : "Select a caster."}</div>`;
+      area.innerHTML = `<div class="alert alert-info mb-0">${caster ? "No prepared spells for this caster." : "Select a caster."}</div>`;
       return;
     }
 
@@ -2110,60 +2146,83 @@ function openSpellDialog() {
     const area = $("spellTargetArea");
     area.innerHTML = "";
 
-    if (!caster || !sp) return;
-
-    const chk = canCastSpell(caster, sp);
-    if (!chk.ok) {
-      area.innerHTML = `<div class="text-body-secondary">${chk.reason}</div>`;
+    if (!caster || !sp) {
+      area.innerHTML = `<div class="alert alert-info mb-0">${caster ? "Select a prepared spell." : "Select a caster."}</div>`;
       return;
     }
 
-    if (sp.targetMode === "singleEnemy") {
-      area.innerHTML = `
-        <div class="row">
-          <label>Target (enemy)
-            <select id="spellTargetEnemy0"></select>
-          </label>
+    const chk = canCastSpell(caster, sp);
+    if (!chk.ok) {
+      area.innerHTML = `<div class="alert alert-warning mb-0">${chk.reason}</div>`;
+      return;
+    }
+
+    const summaryCard = document.createElement("div");
+    summaryCard.className = "card border-info-subtle mb-3";
+    summaryCard.innerHTML = `
+      <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+          <div>
+            <div class="text-uppercase text-secondary small fw-semibold mb-1">Spell effect</div>
+            <div class="fw-semibold">${escapeHtml(sp.name)}</div>
+            <div class="text-body-secondary small">${escapeHtml(formatSpellType(sp))} • Recharge ${sp.recharge}${sp.oncePerBattle ? " • Once per battle" : ""}</div>
+          </div>
+          <span class="badge text-bg-primary">${escapeHtml(formatSpellType(sp))}</span>
         </div>
+        <p class="mb-0 mt-3 small">${escapeHtml(summarizeSpellEffect(sp))}</p>
+      </div>
+    `;
+    area.appendChild(summaryCard);
+
+    const targetCard = document.createElement("div");
+    targetCard.className = "card shadow-sm";
+    targetCard.innerHTML = `
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="card-title mb-0">Choose targets</h6>
+          <span class="badge text-bg-secondary">${escapeHtml(sp.targetMode || "No target required")}</span>
+        </div>
+        <div class="row g-3" id="spellTargetRows"></div>
+      </div>
+    `;
+    area.appendChild(targetCard);
+
+    const targetRows = targetCard.querySelector("#spellTargetRows");
+    const buildTargetGroup = (id, labelText, collection) => {
+      const col = document.createElement("div");
+      col.className = "col-12 col-md-6";
+      col.innerHTML = `
+        <label class="form-label" for="${id}">${labelText}</label>
+        <select class="form-select" id="${id}"></select>
       `;
-      const sel = $("spellTargetEnemy0");
-      state.mobs.forEach((m, i) => {
+      const sel = col.querySelector("select");
+      collection.forEach(([label, disabled]) => {
         const opt = document.createElement("option");
-        opt.value = String(i);
-        opt.textContent = `${m.name}${(m.dead||m.health<=0) ? " (dead)" : ""}`;
-        opt.disabled = !!(m.dead || m.health<=0);
+        opt.value = label.value;
+        opt.textContent = label.text;
+        opt.disabled = disabled;
         sel.appendChild(opt);
       });
+      targetRows.appendChild(col);
+      return sel;
+    };
+
+    if (sp.targetMode === "singleEnemy") {
+      const options = state.mobs.map((m, i) => [{ value: String(i), text: `${m.name}${(m.dead||m.health<=0) ? " (dead)" : ""}` }, !!(m.dead || m.health<=0)]);
+      buildTargetGroup("spellTargetEnemy0", "Target (enemy)", options);
     }
 
     if (sp.targetMode === "multiEnemyDistinct") {
       const n = sp.targetCount ?? 2;
-      const parts = [];
-      for (let k = 0; k < n; k++) {
-        parts.push(`
-          <label>Target ${k+1} (enemy)
-            <select id="spellTargetEnemy${k}"></select>
-          </label>
-        `);
-      }
-      area.innerHTML = `<div class="row">${parts.join("")}</div>`;
-
-      // populate + enforce distinct by disabling chosen enemy in others
       const sels = [];
+      const options = state.mobs.map((m, i) => [{ value: String(i), text: `${m.name}${(m.dead||m.health<=0) ? " (dead)" : ""}` }, !!(m.dead || m.health<=0)]);
       for (let k = 0; k < n; k++) {
-        const sel = $(`spellTargetEnemy${k}`);
+        const sel = buildTargetGroup(`spellTargetEnemy${k}`, `Target ${k+1} (enemy)`, options);
         sels.push(sel);
-        state.mobs.forEach((m, i) => {
-          const opt = document.createElement("option");
-          opt.value = String(i);
-          opt.textContent = `${m.name}${(m.dead||m.health<=0) ? " (dead)" : ""}`;
-          opt.disabled = !!(m.dead || m.health<=0);
-          sel.appendChild(opt);
-        });
       }
       const enforceDistinct = () => {
         const chosen = new Set(sels.map(s => s.value));
-        sels.forEach((sel, idx) => {
+        sels.forEach((sel) => {
           for (const opt of [...sel.options]) {
             const isDead = opt.textContent.includes("(dead)");
             const chosenElsewhere = chosen.has(opt.value) && sel.value !== opt.value;
@@ -2176,21 +2235,8 @@ function openSpellDialog() {
     }
 
     if (sp.targetMode === "singleAlly") {
-      area.innerHTML = `
-        <div class="row">
-          <label>Target (ally)
-            <select id="spellTargetAlly0"></select>
-          </label>
-        </div>
-      `;
-      const sel = $("spellTargetAlly0");
-      state.party.forEach((p, i) => {
-        const opt = document.createElement("option");
-        opt.value = String(i);
-        opt.textContent = `${p.name}${(p.dead||p.health<=0) ? " (dead)" : ""}`;
-        opt.disabled = !!(p.dead || p.health<=0);
-        sel.appendChild(opt);
-      });
+      const options = state.party.map((p, i) => [{ value: String(i), text: `${p.name}${(p.dead||p.health<=0) ? " (dead)" : ""}` }, !!(p.dead || p.health<=0)]);
+      buildTargetGroup("spellTargetAlly0", "Target (ally)", options);
     }
   };
 
@@ -2278,6 +2324,7 @@ function initUI() {
       document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === target));
     });
   });
+  $("playerAttacker").addEventListener("change", updatePlayerActionControls);
   $("playerAttack").addEventListener("click", () => {
     partyAttack(Number($("playerAttacker").value), Number($("playerTarget").value));
   });
@@ -2472,7 +2519,8 @@ function initState() {
   state.selectedCodeBook = normalizeBookKey(state.selectedCodeBook);
   state.skillCheck = normalizeSkillCheck(state.skillCheck);
   if (!loaded) {
-    state.party = [ newMember("Akihiro of Chalice", { fighting: 4, armour: 0, health: 8, maxHealth: 8 }) ];
+    const randomHero = HERO_NAMES[Math.floor(Math.random() * HERO_NAMES.length)];
+    state.party = [ newMember(randomHero) ];
     state.selectedPartyIndex = 0;
     state.mobs = [ { name: "Goblin", atkDice: 4, atkTarget: 5, auto: 0, defTarget: 4, health: 6, maxHealth: 6, dead: false } ];
     state.silverCoins = 0;
