@@ -1996,7 +1996,9 @@ function renderArmies() {
             <select class="form-select" id="${idBase}-garrison" data-army-field="garrison" data-army-index="${idx}">${garrisonOptions}</select>
           </div>
           <div class="col-12 col-md-1 d-flex justify-content-md-end align-items-end">
-            <button type="button" class="btn btn-link btn-sm text-danger" data-army-remove="${idx}">Remove</button>
+            <button type="button" class="btn btn-outline-danger btn-sm lk-icon-btn" data-army-remove="${idx}" aria-label="Remove army">
+              <i class="bi bi-trash" aria-hidden="true"></i>
+            </button>
           </div>
         </div>
       </div>
@@ -2676,7 +2678,10 @@ function initUI() {
     armyList.addEventListener("input", (e) => onArmyFieldChange(e.target));
     armyList.addEventListener("change", (e) => onArmyFieldChange(e.target));
     armyList.addEventListener("click", (e) => {
-      const idx = Number(e.target.getAttribute("data-army-remove"));
+      const btn = e.target.closest("[data-army-remove]");
+      if (!btn) return;
+
+      const idx = Number(btn.getAttribute("data-army-remove"));
       if (!Number.isNaN(idx)) removeArmyAt(idx);
     });
   }
