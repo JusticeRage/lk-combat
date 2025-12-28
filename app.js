@@ -152,11 +152,11 @@ function ensureStatsModalExists() {
               <input type="number" min="0" max="50" id="statArmour" class="form-control">
             </div>
             <div class="col-12 col-md-6">
-              <label class="form-label small text-secondary mb-1" for="statMaxHp">Max HP</label>
+              <label class="form-label small text-secondary mb-1" for="statMaxHp">❤️ Max HP</label>
               <input type="number" min="1" max="999" id="statMaxHp" class="form-control">
             </div>
             <div class="col-12 col-md-6">
-              <label class="form-label small text-secondary mb-1" for="statHp">HP</label>
+              <label class="form-label small text-secondary mb-1" for="statHp">❤️ HP</label>
               <input type="number" min="0" max="999" id="statHp" class="form-control">
             </div>
           </div>
@@ -359,7 +359,7 @@ function renderHpBlock(entity) {
   return `
     <div class="lk-hp" aria-label="Hit points">
       <div class="lk-hp-head">
-        <span class="lk-hp-title">HP</span>
+        <span class="lk-hp-title">❤️ HP</span>
         <span class="lk-hp-num">${current}/${max}</span>
       </div>
       <div class="progress" role="progressbar" aria-valuenow="${current}" aria-valuemin="0" aria-valuemax="${max}">
@@ -377,7 +377,7 @@ function renderPortraitHp(hero) {
   return `
     <div class="lk-portrait-hp" aria-label="Hit points">
       <div class="lk-portrait-hp-head">
-        <span class="lk-portrait-hp-title">HP</span>
+        <span class="lk-portrait-hp-title">❤️ HP</span>
         <span class="lk-portrait-hp-num">${current}/${max}</span>
       </div>
       <div class="progress" role="progressbar" aria-valuenow="${current}" aria-valuemin="0" aria-valuemax="${max}">
@@ -623,11 +623,13 @@ function renderLog() {
 
 function renderLatestRoll() {
   const wrap = $("latestRoll");
-  if (!wrap) return;
+  const title = $("latestRollTitle");
+  if (!wrap || !title) return;
   const lr = state.latestRoll || { rolls: [], successes: 0, successMask: [] };
   const rolls = Array.isArray(lr.rolls) ? lr.rolls : [];
   const successes = Number(lr.successes) || 0;
   const mask = Array.isArray(lr.successMask) ? lr.successMask : [];
+  const hasRolls = rolls.length > 0;
 
   const diceHtml = rolls.map((r, idx) => {
     const face = Math.min(6, Math.max(1, Number(r) || 1));
@@ -636,13 +638,10 @@ function renderLatestRoll() {
     return `<div class="${cls}"><img src="./img/dice_${face}.svg" alt="Die showing ${face}"></div>`;
   }).join("");
 
-  wrap.innerHTML = `
-    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-      <h3 class="h6 mb-0">${successes} 💥</h3>
-      <div class="text-body-secondary small">${rolls.length ? "Latest roll" : ""}</div>
-    </div>
-    ${rolls.length ? `<div class="lk-dice-row">${diceHtml}</div>` : `<div class="text-body-secondary small">No rolls yet.</div>`}
-  `;
+  title.textContent = hasRolls ? `Latest roll: ${successes} 💥` : "Latest roll";
+  wrap.innerHTML = hasRolls
+    ? `<div class="lk-dice-row">${diceHtml}</div>`
+    : `<div class="text-body-secondary small">No rolls yet.</div>`;
 }
 
 function snapshot() {
@@ -1264,11 +1263,11 @@ function renderEditors() {
             <input id="${idPrefix}-name" type="text" class="form-control form-control-sm" data-mk="name" data-mi="${idx}" value="${escapeHtml(m.name)}">
           </div>
           <div class="col-6 col-md-4 col-lg-2">
-            <label class="form-label mb-1" for="${idPrefix}-atkDice">Atk dice</label>
+            <label class="form-label mb-1" for="${idPrefix}-atkDice">🎲 Atk dice</label>
             <input id="${idPrefix}-atkDice" type="number" class="form-control form-control-sm" min="0" max="50" data-mk="atkDice" data-mi="${idx}" value="${m.atkDice}">
           </div>
           <div class="col-6 col-md-4 col-lg-2">
-            <label class="form-label mb-1" for="${idPrefix}-atkTarget">Atk target</label>
+            <label class="form-label mb-1" for="${idPrefix}-atkTarget">⚔️ Atk target</label>
             <input id="${idPrefix}-atkTarget" type="number" class="form-control form-control-sm" min="2" max="6" data-mk="atkTarget" data-mi="${idx}" value="${m.atkTarget}">
           </div>
           <div class="col-6 col-md-4 col-lg-2">
@@ -1276,15 +1275,15 @@ function renderEditors() {
             <input id="${idPrefix}-auto" type="number" class="form-control form-control-sm" min="0" max="50" data-mk="auto" data-mi="${idx}" value="${m.auto}">
           </div>
           <div class="col-6 col-md-4 col-lg-2">
-            <label class="form-label mb-1" for="${idPrefix}-defTarget">Def target</label>
+            <label class="form-label mb-1" for="${idPrefix}-defTarget">🛡️ Def target</label>
             <input id="${idPrefix}-defTarget" type="number" class="form-control form-control-sm" min="2" max="6" data-mk="defTarget" data-mi="${idx}" value="${m.defTarget}">
           </div>
           <div class="col-6 col-md-4 col-lg-2">
-            <label class="form-label mb-1" for="${idPrefix}-maxHealth">Max HP</label>
+            <label class="form-label mb-1" for="${idPrefix}-maxHealth">❤️ Max HP</label>
             <input id="${idPrefix}-maxHealth" type="number" class="form-control form-control-sm" min="1" max="999" data-mk="maxHealth" data-mi="${idx}" value="${m.maxHealth}">
           </div>
           <div class="col-6 col-md-4 col-lg-2">
-            <label class="form-label mb-1" for="${idPrefix}-health">HP</label>
+            <label class="form-label mb-1" for="${idPrefix}-health">❤️ HP</label>
             <input id="${idPrefix}-health" type="number" class="form-control form-control-sm" min="0" max="999" data-mk="health" data-mi="${idx}" value="${m.health}">
           </div>
           <div class="col-12 col-md-auto ms-auto text-end">
@@ -1488,7 +1487,7 @@ function renderTables() {
     }).join("");
     pt.innerHTML = `
       <table class="table align-middle mb-0">
-        <thead><tr><th>Hero</th><th>Fight</th><th>Arm</th><th>HP</th></tr></thead>
+        <thead><tr><th>Hero</th><th>⚔️ Fight</th><th>🛡️ Arm</th><th>❤️ HP</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
@@ -1499,17 +1498,17 @@ function renderTables() {
     mt.innerHTML = `<div class="text-body-secondary">No opponents.</div>`;
   } else {
     const rows = state.mobs.map((m, idx) => `
-      <tr class="${(m.dead||m.health<=0) ? "dead" : ""}">
+        <tr class="${(m.dead||m.health<=0) ? "dead" : ""}">
         <td>${m.name}</td>
-        <td>${m.atkDice} (${m.atkTarget}+ )${m.auto ? ` +${m.auto} Auto` : ""}</td>
-        <td>${m.defTarget}+</td>
+        <td>🎲 ${m.atkDice} (⚔️ ${m.atkTarget}+ )${m.auto ? ` +${m.auto} Auto` : ""}</td>
+        <td>🛡️ ${m.defTarget}+</td>
         <td>${renderHpBlock(m)}</td>
         <td class="text-body-secondary">${state.turn==="enemies" && idx===state.enemyIndex ? "← acting" : ""}</td>
       </tr>
     `).join("");
     mt.innerHTML = `
       <table class="table align-middle mb-0">
-        <thead><tr><th>Name</th><th>Attack</th><th>Def</th><th>HP</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Attack</th><th>🛡️ Def</th><th>❤️ HP</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
@@ -1551,6 +1550,11 @@ function renderControls() {
     pa.appendChild(opt);
   }
 
+  if (!pa.value || pa.options[pa.selectedIndex]?.disabled) {
+    const firstReady = [...pa.options].find(o => !o.disabled);
+    if (firstReady) pa.value = firstReady.value;
+  }
+
   for (let i = 0; i < state.mobs.length; i++) {
     const m = state.mobs[i];
     const opt = document.createElement("option");
@@ -1564,8 +1568,13 @@ function renderControls() {
     state.party.some(p => !p.dead && p.health > 0 && !p.actedThisRound) &&
     livingMobs().length > 0;
 
+  const selectedAttacker = state.party[Number(pa.value)];
+  const canCastSelected = partyTurn && !!selectedAttacker &&
+    !selectedAttacker.dead && selectedAttacker.health > 0 && !selectedAttacker.actedThisRound &&
+    isSpellcaster(selectedAttacker.name) && livingMobs().length > 0;
+
   $("playerAttack").disabled = !canPartyAct;
-  $("playerSpell").disabled = !canPartyAct;
+  $("playerSpell").disabled = !canCastSelected;
   $("playerSkip").disabled = !partyTurn;
 
   // enemy controls
@@ -1655,6 +1664,7 @@ function onCodeToggle(e) {
 }
 
 function renderAll() {
+  clampEnemyIndex();
   renderEditors();
   renderTables();
   renderControls();
@@ -1730,18 +1740,20 @@ function openSpellDialog() {
   $("spellError").style.display = "none";
   $("spellError").textContent = "";
 
-  // caster list: only living + not acted
+  const selectedCasterIdx = Number($("playerAttacker")?.value);
+  const selectedCaster = state.party[selectedCasterIdx];
+  if (!selectedCaster || !isSpellcaster(selectedCaster.name) || selectedCaster.dead || selectedCaster.health <= 0 || selectedCaster.actedThisRound) {
+    return;
+  }
+
+  // caster list: selected caster only
   const casterSel = $("spellCaster");
   casterSel.innerHTML = "";
-  state.party.forEach((p, idx) => {
-    const opt = document.createElement("option");
-    opt.value = String(idx);
-    const allowedCaster = isSpellcaster(p.name);
-    const suffix = `${allowedCaster ? "" : " (cannot cast)"}${p.actedThisRound ? " (acted)" : ""}${(p.dead||p.health<=0) ? " (dead)" : ""}`;
-    opt.textContent = `${p.name}${suffix}`;
-    opt.disabled = !!(!allowedCaster || p.dead || p.health<=0 || p.actedThisRound);
-    casterSel.appendChild(opt);
-  });
+  const opt = document.createElement("option");
+  opt.value = String(selectedCasterIdx);
+  opt.textContent = selectedCaster.name;
+  casterSel.appendChild(opt);
+  casterSel.disabled = true;
 
   // spells list: disable if used by selected caster (updated on change)
   const spellSel = $("spellSelect");
