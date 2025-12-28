@@ -4,7 +4,8 @@ import {
   clampInt, deepClone, fmtDice, nowStamp,
   computeAttackHits, computeEnemyHits,
   armourSaveRolls, getEffectiveArmour,
-  clearBattleBuffs, addBattleArmourBuff
+  clearBattleBuffs, addBattleArmourBuff,
+  rollD6
 } from "./engine.js";
 
 const HERO_NAMES = [
@@ -71,12 +72,78 @@ const STAT_ICONS = {
   armour: "🛡️",
 };
 
+const SKILL_OPTIONS = [
+  { key: "fighting", label: STAT_LABELS.fighting },
+  { key: "stealth", label: STAT_LABELS.stealth },
+  { key: "lore", label: STAT_LABELS.lore },
+  { key: "survival", label: STAT_LABELS.survival },
+  { key: "charisma", label: STAT_LABELS.charisma },
+];
+
+const DEFAULT_SKILL_CHECK = {
+  name: "Sneak past the goblin",
+  type: "team", // team | individual
+  skill: "stealth",
+  dc: 4,
+  requiredSuccesses: 4,
+  participants: [], // hero names
+  latestRoll: { groups: [], totalSuccesses: 0 },
+  lastResult: null,
+};
+
 const $ = (id) => document.getElementById(id);
 
 function formatStatLabel(key) {
   const label = STAT_LABELS[key] || key;
   const icon = STAT_ICONS[key];
   return icon ? `${icon} ${label}` : label;
+}
+
+function skillLabelForKey(key) {
+  const found = SKILL_OPTIONS.find(o => o.key === key);
+  return found?.label || formatStatLabel(key);
+}
+
+function findSkillKeyFromName(name) {
+  if (!name) return "";
+  const norm = String(name).trim().toLowerCase();
+  const found = SKILL_OPTIONS.find(o => o.key === norm || o.label?.toLowerCase() === norm);
+  if (found) return found.key;
+  const fuzzy = SKILL_OPTIONS.find(o => norm.includes(o.label?.toLowerCase()));
+  return fuzzy?.key || "";
+}
+
+function normalizeSkillCheck(raw) {
+  const base = { ...DEFAULT_SKILL_CHECK, participants: [...DEFAULT_SKILL_CHECK.participants] };
+  if (!raw || typeof raw !== "object") return base;
+
+  const participants = Array.isArray(raw.participants)
+    ? raw.participants.filter(Boolean).slice(0, 2)
+    : [];
+
+  const lastResult = (raw.lastResult && typeof raw.lastResult === "object") ? {
+    success: !!raw.lastResult.success,
+    successes: clampInt(raw.lastResult.successes, 0, 999, 0),
+    required: clampInt(raw.lastResult.required, 1, 999, base.requiredSuccesses),
+    diceUsed: clampInt(raw.lastResult.diceUsed, 0, 999, 0),
+    rawDice: clampInt(raw.lastResult.rawDice, 0, 999, 0),
+    capped: !!raw.lastResult.capped,
+    participants: Array.isArray(raw.lastResult.participants)
+      ? raw.lastResult.participants.filter(Boolean).slice(0, 2)
+      : [],
+  } : null;
+
+  return {
+    ...base,
+    name: typeof raw.name === "string" ? raw.name : base.name,
+    type: raw.type === "team" ? "team" : "individual",
+    skill: SKILL_OPTIONS.some(o => o.key === raw.skill) ? raw.skill : base.skill,
+    dc: clampInt(raw.dc, 2, 6, base.dc),
+    requiredSuccesses: clampInt(raw.requiredSuccesses, 1, 99, base.requiredSuccesses),
+    participants,
+    latestRoll: buildLatestRoll(raw.latestRoll?.groups || []),
+    lastResult,
+  };
 }
 
 function bsModalShow(id) {
@@ -445,6 +512,16 @@ function saveSetupToStorage(state) {
     })),
     codes: state.codes,
     selectedCodeBook: state.selectedCodeBook,
+    skillCheck: {
+      name: state.skillCheck.name,
+      type: state.skillCheck.type,
+      skill: state.skillCheck.skill,
+      dc: state.skillCheck.dc,
+      requiredSuccesses: state.skillCheck.requiredSuccesses,
+      participants: state.skillCheck.participants,
+      latestRoll: state.skillCheck.latestRoll,
+      lastResult: state.skillCheck.lastResult,
+    },
   };
   try { localStorage.setItem(LS_KEY, JSON.stringify(payload)); } catch {}
 }
@@ -482,6 +559,8 @@ function loadSetupFromStorage(state) {
         dead: false
       }));
     }
+
+    state.skillCheck = normalizeSkillCheck(obj.skillCheck);
 
     return true;
   } catch {
@@ -578,6 +657,42 @@ function parseEncounterText(text) {
   return mobs;
 }
 
+// --- Skill checks ---
+function getSkillValueFor(member, skillKey) {
+  if (!member || !skillKey) return 0;
+  return Math.max(0, getEffectiveStat(member, skillKey));
+}
+
+function computeSkillDice(skillKey, heroes) {
+  const rawDice = (heroes || []).reduce((sum, h) => sum + getSkillValueFor(h, skillKey), 0);
+  return { rawDice, dice: Math.min(rawDice, 20), capped: rawDice > 20 };
+}
+
+function parseSkillCheckImport(text) {
+  const lines = text.replace(/\r/g, "").split("\n").map(l => l.trim()).filter(Boolean);
+  if (lines.length < 3) throw new Error("Need at least 3 lines (name, skill, successes).");
+
+  const titleLine = lines[0];
+  const titleMatch = titleLine.match(/^(.*)\((Individual|Team)\s+check\)\s*$/i);
+  if (!titleMatch) throw new Error("First line should include '(Individual check)' or '(Team check)'.");
+  const name = titleMatch[1].trim();
+  const type = titleMatch[2].toLowerCase().startsWith("team") ? "team" : "individual";
+
+  const skillLine = lines.find(l => /^skill\s*and\s*dc/i.test(l)) || lines[1];
+  const skillMatch = skillLine?.match(/skill\s*and\s*dc:\s*(.+?)\s*\(\s*([2-6])\s*\+\s*\)\s*$/i);
+  if (!skillMatch) throw new Error("Could not read the 'Skill and DC' line.");
+  const skillKey = findSkillKeyFromName(skillMatch[1]);
+  if (!skillKey) throw new Error(`Unknown skill: ${skillMatch[1]}`);
+  const dc = Number(skillMatch[2]);
+
+  const successLine = lines.find(l => /^successes\s+required/i.test(l)) || lines[2];
+  const successMatch = successLine?.match(/successes\s+required:\s*(\d+)/i);
+  if (!successMatch) throw new Error("Could not read the required successes.");
+  const requiredSuccesses = Number(successMatch[1]);
+
+  return normalizeSkillCheck({ name, type, skill: skillKey, dc, requiredSuccesses, participants: [] });
+}
+
 // --- State ---
 const state = {
   phase: "setup", // setup | combat | ended
@@ -594,6 +709,7 @@ const state = {
   codes: createEmptyCodes(),
   selectedCodeBook: CODE_BOOKS[0]?.key || "A",
   latestRoll: { groups: [], totalSuccesses: 0 },
+  skillCheck: normalizeSkillCheck(DEFAULT_SKILL_CHECK),
 };
 
 function buildLatestRoll(groups) {
@@ -636,11 +752,11 @@ function renderLog() {
   el.scrollTop = el.scrollHeight;
 }
 
-function renderLatestRoll() {
-  const wrap = $("latestRoll");
-  const title = $("latestRollTitle");
-  if (!wrap || !title) return;
-  const lr = state.latestRoll || { groups: [], totalSuccesses: 0 };
+function renderRollDisplay(opts) {
+  const wrap = $(opts?.wrapId);
+  const title = opts?.titleId ? $(opts.titleId) : null;
+  if (!wrap) return;
+  const lr = opts?.roll || { groups: [], totalSuccesses: 0 };
   const groups = Array.isArray(lr.groups) ? lr.groups : [];
   const hasRolls = groups.some(g => Array.isArray(g.rolls) && g.rolls.length > 0);
 
@@ -659,10 +775,17 @@ function renderLatestRoll() {
     return `<div class="lk-roll-group">${label}<div class="lk-dice-row">${diceHtml}</div></div>`;
   }).join("");
 
-  title.textContent = hasRolls ? `Latest roll: ${lr.totalSuccesses || 0} 💥` : "Latest roll";
+  if (title) title.textContent = hasRolls
+    ? `Latest roll: ${lr.totalSuccesses || 0} 💥`
+    : (opts?.emptyTitle || "Latest roll");
+
   wrap.innerHTML = hasRolls
     ? groupHtml
-    : `<div class="text-body-secondary small">No rolls yet.</div>`;
+    : `<div class="text-body-secondary small">${opts?.emptyText || "No rolls yet."}</div>`;
+}
+
+function renderLatestRoll() {
+  renderRollDisplay({ wrapId: "latestRoll", titleId: "latestRollTitle", roll: state.latestRoll, emptyText: "No rolls yet." });
 }
 
 function snapshot() {
@@ -1686,13 +1809,164 @@ function onCodeToggle(e) {
   saveSetupToStorage(state);
 }
 
+function getSkillParticipants() {
+  const sc = state.skillCheck || DEFAULT_SKILL_CHECK;
+  const needed = sc.type === "team" ? 2 : 1;
+  const names = Array.isArray(sc.participants) ? sc.participants.slice(0, needed) : [];
+  const heroes = [];
+  for (const name of names) {
+    const h = state.party.find(p => p.name === name && !p.dead && p.health > 0);
+    if (h && !heroes.includes(h)) heroes.push(h);
+    if (heroes.length >= needed) break;
+  }
+  return heroes;
+}
+
+function renderSkillRoll() {
+  renderRollDisplay({
+    wrapId: "skillRollDisplay",
+    titleId: "skillRollTitle",
+    roll: state.skillCheck?.latestRoll,
+    emptyTitle: "Latest roll",
+    emptyText: "Roll to see the dice.",
+  });
+}
+
+function renderSkillCheck() {
+  const nameInput = $("skillName");
+  const typeSelect = $("skillType");
+  const skillSelect = $("skillStat");
+  const dcInput = $("skillDc");
+  const reqInput = $("skillRequired");
+  const heroA = $("skillHeroA");
+  const heroB = $("skillHeroB");
+  const heroBWrap = $("skillHeroBWrap");
+  const summary = $("skillDiceSummary");
+  const note = $("skillDiceNote");
+  const rollBtn = $("skillRoll");
+  const outcome = $("skillOutcome");
+  if (!nameInput || !typeSelect || !skillSelect || !dcInput || !reqInput || !heroA || !summary || !note || !rollBtn || !outcome) return;
+
+  state.skillCheck = normalizeSkillCheck(state.skillCheck);
+  const sc = state.skillCheck;
+
+  // populate stat select
+  skillSelect.innerHTML = SKILL_OPTIONS.map(o => `<option value="${o.key}">${escapeHtml(skillLabelForKey(o.key))}</option>`).join("");
+
+  nameInput.value = sc.name;
+  typeSelect.value = sc.type;
+  skillSelect.value = sc.skill;
+  dcInput.value = sc.dc;
+  reqInput.value = sc.requiredSuccesses;
+
+  if (heroBWrap) heroBWrap.style.display = sc.type === "team" ? "" : "none";
+
+  const living = state.party.filter(p => !p.dead && p.health > 0);
+  const populateHeroSelect = (sel, desired, banned) => {
+    if (!sel) return "";
+    sel.innerHTML = "";
+    for (const p of living) {
+      const opt = document.createElement("option");
+      opt.value = p.name;
+      opt.textContent = `${p.name} — ${skillLabelForKey(sc.skill)} ${getSkillValueFor(p, sc.skill)}`;
+      opt.disabled = !!(banned && p.name === banned);
+      sel.appendChild(opt);
+    }
+    if (!living.length) {
+      const opt = document.createElement("option");
+      opt.textContent = "Add a living hero";
+      opt.disabled = true;
+      sel.appendChild(opt);
+      sel.disabled = true;
+      return "";
+    }
+    sel.disabled = false;
+    const candidates = living.map(p => p.name).filter(n => !banned || n !== banned);
+    const chosen = candidates.includes(desired) ? desired : (candidates[0] || "");
+    sel.value = chosen;
+    return chosen;
+  };
+
+  const selA = populateHeroSelect(heroA, sc.participants[0], null);
+  const selB = sc.type === "team" ? populateHeroSelect(heroB, sc.participants[1], selA) : "";
+
+  const participants = (sc.type === "team")
+    ? [selA, selB].filter(Boolean)
+    : [selA].filter(Boolean);
+  state.skillCheck.participants = participants;
+
+  const heroes = getSkillParticipants();
+  const diceInfo = computeSkillDice(sc.skill, heroes);
+  const neededHeroes = sc.type === "team" ? 2 : 1;
+
+  summary.textContent = heroes.length >= neededHeroes
+    ? `${diceInfo.dice}d6 @ ${sc.dc}+ • Need ${sc.requiredSuccesses} successes${diceInfo.capped ? ` (capped from ${diceInfo.rawDice})` : ""}`
+    : "Pick hero(s) to roll.";
+
+  note.textContent = heroes.length
+    ? heroes.map(h => `${h.name}: ${skillLabelForKey(sc.skill)} ${getSkillValueFor(h, sc.skill)}`).join(" • ")
+    : "Select party members to combine their skill dice.";
+
+  rollBtn.disabled = !(heroes.length >= neededHeroes && diceInfo.dice > 0);
+
+  if (sc.lastResult) {
+    const cls = sc.lastResult.success ? "alert-success" : "alert-danger";
+    const participantLabel = (sc.lastResult.participants || []).join(" + ") || "Party";
+    const capNote = sc.lastResult.capped ? ` (capped from ${sc.lastResult.rawDice})` : "";
+    outcome.innerHTML = `
+      <div class="alert ${cls} mb-0">
+        <div class="fw-semibold">${escapeHtml(sc.name || "Skill check")}</div>
+        <div>${escapeHtml(participantLabel)} rolled ${sc.lastResult.diceUsed}d6${capNote} @ ${sc.dc}+ → ${sc.lastResult.successes}/${sc.lastResult.required} successes.</div>
+        <div class="fw-semibold mt-1">${sc.lastResult.success ? "Success!" : "Failure."}</div>
+      </div>`;
+  } else {
+    outcome.innerHTML = `<div class="text-body-secondary small">Define a check and roll to see the result.</div>`;
+  }
+
+  renderSkillRoll();
+}
+
+function performSkillRoll() {
+  state.skillCheck = normalizeSkillCheck(state.skillCheck);
+  const sc = state.skillCheck;
+  const heroes = getSkillParticipants();
+  const needed = sc.type === "team" ? 2 : 1;
+  if (heroes.length < needed) return;
+
+  const diceInfo = computeSkillDice(sc.skill, heroes);
+  if (diceInfo.dice <= 0) return;
+
+  const rolls = rollD6(diceInfo.dice);
+  const successes = rolls.filter(r => r >= sc.dc).length;
+  const pass = successes >= sc.requiredSuccesses;
+  const label = sc.name ? `${sc.name} (${skillLabelForKey(sc.skill)})` : skillLabelForKey(sc.skill);
+  const rollData = buildLatestRoll([{ rolls, target: sc.dc, label }]);
+
+  state.skillCheck.latestRoll = rollData;
+  state.skillCheck.lastResult = {
+    success: pass,
+    successes,
+    required: sc.requiredSuccesses,
+    diceUsed: diceInfo.dice,
+    rawDice: diceInfo.rawDice,
+    capped: diceInfo.capped,
+    participants: heroes.map(h => h.name),
+  };
+  state.latestRoll = rollData;
+  saveSetupToStorage(state);
+  renderSkillCheck();
+  renderLatestRoll();
+}
+
 function renderAll() {
   clampEnemyIndex();
   renderEditors();
   renderTables();
   renderControls();
   renderCodes();
+  renderSkillCheck();
   renderLatestRoll();
+  renderSkillRoll();
   renderLog();
 }
 
@@ -2024,6 +2298,64 @@ function initUI() {
     catch { pushLog("(!) Could not copy log (clipboard permission blocked)."); }
   });
 
+  // Skill check
+  $("skillName").addEventListener("input", (e) => {
+    state.skillCheck.name = e.target.value;
+    saveSetupToStorage(state);
+    renderSkillCheck();
+  });
+  $("skillType").addEventListener("change", (e) => {
+    state.skillCheck.type = e.target.value === "team" ? "team" : "individual";
+    if (state.skillCheck.type === "individual") state.skillCheck.participants = state.skillCheck.participants.slice(0, 1);
+    saveSetupToStorage(state);
+    renderSkillCheck();
+  });
+  $("skillStat").addEventListener("change", (e) => {
+    state.skillCheck.skill = e.target.value;
+    saveSetupToStorage(state);
+    renderSkillCheck();
+  });
+  $("skillDc").addEventListener("input", (e) => {
+    state.skillCheck.dc = clampInt(e.target.value, 2, 6, state.skillCheck.dc);
+    saveSetupToStorage(state);
+    renderSkillCheck();
+  });
+  $("skillRequired").addEventListener("input", (e) => {
+    state.skillCheck.requiredSuccesses = clampInt(e.target.value, 1, 99, state.skillCheck.requiredSuccesses);
+    saveSetupToStorage(state);
+    renderSkillCheck();
+  });
+  $("skillHeroA").addEventListener("change", (e) => {
+    state.skillCheck.participants[0] = e.target.value;
+    saveSetupToStorage(state);
+    renderSkillCheck();
+  });
+  $("skillHeroB").addEventListener("change", (e) => {
+    state.skillCheck.participants[1] = e.target.value;
+    saveSetupToStorage(state);
+    renderSkillCheck();
+  });
+  $("skillImportBtn").addEventListener("click", () => {
+    $("skillImportError").style.display = "none";
+    try {
+      const parsed = parseSkillCheckImport($("skillImportText").value || "");
+      parsed.latestRoll = { groups: [], totalSuccesses: 0 };
+      parsed.lastResult = null;
+      state.skillCheck = parsed;
+      saveSetupToStorage(state);
+      renderSkillCheck();
+    } catch (e) {
+      $("skillImportError").textContent = String(e?.message || e);
+      $("skillImportError").style.display = "";
+    }
+  });
+  $("skillReset").addEventListener("click", () => {
+    state.skillCheck = normalizeSkillCheck(DEFAULT_SKILL_CHECK);
+    saveSetupToStorage(state);
+    renderSkillCheck();
+  });
+  $("skillRoll").addEventListener("click", performSkillRoll);
+
   $("addMember").addEventListener("click", openHeroDialog);
   $("clearParty").addEventListener("click", () => {
     if (!confirm("Clear party setup and saved data?")) return;
@@ -2131,6 +2463,7 @@ function initState() {
   const loaded = loadSetupFromStorage(state);
   state.codes = normalizeCodes(state.codes);
   state.selectedCodeBook = normalizeBookKey(state.selectedCodeBook);
+  state.skillCheck = normalizeSkillCheck(state.skillCheck);
   if (!loaded) {
     state.party = [ newMember("Akihiro of Chalice", { fighting: 4, armour: 0, health: 8, maxHealth: 8 }) ];
     state.selectedPartyIndex = 0;
@@ -2138,6 +2471,7 @@ function initState() {
     state.silverCoins = 0;
     state.codes = createEmptyCodes();
     state.selectedCodeBook = CODE_BOOKS[0]?.key || "A";
+    state.skillCheck = normalizeSkillCheck(DEFAULT_SKILL_CHECK);
     saveSetupToStorage(state);
   }
 }
