@@ -55,6 +55,12 @@ const STAT_ICONS = {
 
 const $ = (id) => document.getElementById(id);
 
+function formatStatLabel(key) {
+  const label = STAT_LABELS[key] || key;
+  const icon = STAT_ICONS[key];
+  return icon ? `${icon} ${label}` : label;
+}
+
 function bsModalShow(id) {
   const el = $(id);
   if (!el) return;
@@ -104,27 +110,27 @@ function ensureStatsModalExists() {
         <div class="modal-body">
           <div class="row g-3">
             <div class="col-12 col-md-4">
-              <label class="form-label small text-secondary mb-1" for="statFighting">Fighting</label>
+              <label class="form-label small text-secondary mb-1" for="statFighting">⚔️ Fighting</label>
               <input type="number" min="0" max="50" id="statFighting" class="form-control">
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label small text-secondary mb-1" for="statStealth">Stealth</label>
+              <label class="form-label small text-secondary mb-1" for="statStealth">🥷🏻 Stealth</label>
               <input type="number" min="0" max="50" id="statStealth" class="form-control">
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label small text-secondary mb-1" for="statLore">Lore</label>
+              <label class="form-label small text-secondary mb-1" for="statLore">📚 Lore</label>
               <input type="number" min="0" max="50" id="statLore" class="form-control">
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label small text-secondary mb-1" for="statSurvival">Survival</label>
+              <label class="form-label small text-secondary mb-1" for="statSurvival">🏕️ Survival</label>
               <input type="number" min="0" max="50" id="statSurvival" class="form-control">
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label small text-secondary mb-1" for="statCharisma">Charisma</label>
+              <label class="form-label small text-secondary mb-1" for="statCharisma">💬 Charisma</label>
               <input type="number" min="0" max="50" id="statCharisma" class="form-control">
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label small text-secondary mb-1" for="statArmour">Armour</label>
+              <label class="form-label small text-secondary mb-1" for="statArmour">🛡️ Armour</label>
               <input type="number" min="0" max="50" id="statArmour" class="form-control">
             </div>
             <div class="col-12 col-md-6">
@@ -297,9 +303,7 @@ function computeDisplayedStats(member) {
 }
 
 function formatStatBadge(key, stat) {
-  const icon = STAT_ICONS[key] ? `${STAT_ICONS[key]} ` : "";
-  const label = STAT_LABELS[key] || key;
-  return `${icon}${label}: ${stat.base} (${stat.modified})`;
+  return `${formatStatLabel(key)}: ${stat.base} (${stat.modified})`;
 }
 
 function formatCompactStat(stat) {
@@ -331,7 +335,7 @@ function renderStatGrid(hero) {
   return `
     <div class="lk-stat-grid">
       ${order.map(key => `
-        <div class="lk-stat-label">${STAT_LABELS[key]}</div>
+        <div class="lk-stat-label">${formatStatLabel(key)}</div>
         <div class="lk-stat-value">${escapeHtml(formatCompactStat(stats[key]))}</div>
       `).join("")}
     </div>
@@ -343,7 +347,7 @@ function describeItem(item, entry) {
   const details = [];
   const mods = Object.entries(item.modifiers || {}).filter(([, v]) => v);
   if (mods.length) {
-    details.push(mods.map(([k, v]) => `${STAT_LABELS[k] || k}${v >= 0 ? "+" : ""}${v}`).join(", "));
+    details.push(mods.map(([k, v]) => `${formatStatLabel(k)}${v >= 0 ? "+" : ""}${v}`).join(", "));
   }
   if (item.hands) details.push(item.hands === 2 ? "Two-handed" : "One-handed");
   if (item.type === "weapon") details.push("Weapon");
@@ -1020,8 +1024,9 @@ function renderEditors() {
       </div>
     `;
 
+    const isCaster = isSpellcaster(p.name);
     const spellRows = [];
-    if (isSpellcaster(p.name)) {
+    if (isCaster) {
       const knownSpells = Array.isArray(p.spells)
         ? Array.from({ length: SPELL_SLOTS }, (_, i) => p.spells[i] || { id: "", status: "ready" })
         : [];
@@ -1046,6 +1051,30 @@ function renderEditors() {
         `);
       }
     }
+
+    const notesSectionClass = isCaster ? "lk-section lk-section--wide" : "lk-section";
+
+    const notesSection = `
+      <div class="${notesSectionClass}">
+        <div class="lk-section-heading">
+          <p class="lk-section-title mb-0">Notes</p>
+          <span class="text-secondary small">Reminders for this hero</span>
+        </div>
+        <textarea data-k="notes" data-i="${state.selectedPartyIndex}" spellcheck="false" class="form-control lk-notes">${escapeHtml(p.notes || "")}</textarea>
+      </div>
+    `;
+
+    const spellsSection = isCaster ? `
+      <div class="lk-section">
+        <div class="lk-section-heading">
+          <p class="lk-section-title mb-0">Spells</p>
+          <span class="text-secondary small">${spellRows.length} slots</span>
+        </div>
+        <div class="spell-card">
+          <div class="spell-body">${spellRows.join("")}</div>
+        </div>
+      </div>
+    ` : "";
 
     const sheet = document.createElement("div");
     sheet.className = "lk-party-sheet";
@@ -1087,24 +1116,8 @@ function renderEditors() {
             </div>
             ${equipmentMeta}
           </div>
-          <div class="lk-section">
-            <div class="lk-section-heading">
-              <p class="lk-section-title mb-0">Notes</p>
-              <span class="text-secondary small">Reminders for this hero</span>
-            </div>
-            <textarea data-k="notes" data-i="${state.selectedPartyIndex}" spellcheck="false" class="form-control lk-notes">${escapeHtml(p.notes || "")}</textarea>
-          </div>
-          ${isSpellcaster(p.name) ? `
-            <div class="lk-section">
-              <div class="lk-section-heading">
-                <p class="lk-section-title mb-0">Spells</p>
-                <span class="text-secondary small">${spellRows.length} slots</span>
-              </div>
-              <div class="spell-card">
-                <div class="spell-body">${spellRows.join("")}</div>
-              </div>
-            </div>
-          ` : ""}
+          ${spellsSection}
+          ${notesSection}
         </div>
       </div>
     `;
