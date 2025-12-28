@@ -154,6 +154,32 @@
   background: var(--bs-tertiary-bg);
 }
 
+.lk-dice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.lk-die {
+  border: 2px solid var(--bs-border-color);
+  border-radius: .65rem;
+  width: 56px;
+  height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: .35rem;
+  background: var(--bs-body-bg);
+  box-shadow: var(--lk-shadow-sm);
+}
+
+.lk-die img { width: 100%; height: 100%; }
+
+.lk-die.is-success {
+  border-color: var(--bs-success-border-subtle);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--bs-success-bg-subtle) 80%, transparent);
+}
+
 /* Textarea in import modal */
 .lk-textarea {
   min-height: 220px;

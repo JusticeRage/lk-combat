@@ -593,7 +593,22 @@ const state = {
   selectedPartyIndex: 0,
   codes: createEmptyCodes(),
   selectedCodeBook: CODE_BOOKS[0]?.key || "A",
+  latestRoll: { rolls: [], successes: 0, successMask: [] },
 };
+
+function recordLatestRoll({ rolls, target, successPredicate }) {
+  if (!Array.isArray(rolls)) {
+    state.latestRoll = { rolls: [], successes: 0, successMask: [] };
+    return;
+  }
+
+  const successMask = rolls.map(r => successPredicate ? successPredicate(r) : (target != null ? r >= target : false));
+  state.latestRoll = {
+    rolls: [...rolls],
+    successes: successMask.filter(Boolean).length,
+    successMask,
+  };
+}
 
 function pushLog(line) {
   state.log.push(line);
@@ -606,11 +621,36 @@ function renderLog() {
   el.scrollTop = el.scrollHeight;
 }
 
+function renderLatestRoll() {
+  const wrap = $("latestRoll");
+  if (!wrap) return;
+  const lr = state.latestRoll || { rolls: [], successes: 0, successMask: [] };
+  const rolls = Array.isArray(lr.rolls) ? lr.rolls : [];
+  const successes = Number(lr.successes) || 0;
+  const mask = Array.isArray(lr.successMask) ? lr.successMask : [];
+
+  const diceHtml = rolls.map((r, idx) => {
+    const face = Math.min(6, Math.max(1, Number(r) || 1));
+    const isSuccess = !!mask[idx];
+    const cls = `lk-die${isSuccess ? " is-success" : ""}`;
+    return `<div class="${cls}"><img src="./img/dice_${face}.svg" alt="Die showing ${face}"></div>`;
+  }).join("");
+
+  wrap.innerHTML = `
+    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+      <h3 class="h6 mb-0">${successes} 💥</h3>
+      <div class="text-body-secondary small">${rolls.length ? "Latest roll" : ""}</div>
+    </div>
+    ${rolls.length ? `<div class="lk-dice-row">${diceHtml}</div>` : `<div class="text-body-secondary small">No rolls yet.</div>`}
+  `;
+}
+
 function snapshot() {
   state.history.push(deepClone({
     phase: state.phase, round: state.round, turn: state.turn,
     party: state.party, mobs: state.mobs, enemyIndex: state.enemyIndex,
-    log: state.log, battleSeed: state.battleSeed, selectedPartyIndex: state.selectedPartyIndex
+    log: state.log, battleSeed: state.battleSeed, selectedPartyIndex: state.selectedPartyIndex,
+    latestRoll: state.latestRoll,
   }));
   if (state.history.length > 50) state.history.shift();
   $("undo").disabled = state.history.length === 0;
@@ -628,12 +668,24 @@ function undo() {
   state.log = last.log;
   state.battleSeed = last.battleSeed;
   state.selectedPartyIndex = Number.isInteger(last.selectedPartyIndex) ? last.selectedPartyIndex : 0;
+  state.latestRoll = last.latestRoll || { rolls: [], successes: 0, successMask: [] };
   clampSelectedPartyIndex();
   renderAll();
 }
 
 const livingParty = () => state.party.filter(p => !p.dead && p.health > 0);
 const livingMobs = () => state.mobs.filter(m => !m.dead && m.health > 0);
+
+function clampEnemyIndex() {
+  while (state.enemyIndex < state.mobs.length && (state.mobs[state.enemyIndex].dead || state.mobs[state.enemyIndex].health <= 0)) {
+    state.enemyIndex++;
+  }
+
+  if (state.enemyIndex >= state.mobs.length) {
+    const next = state.mobs.findIndex(m => !m.dead && m.health > 0);
+    state.enemyIndex = next >= 0 ? next : 0;
+  }
+}
 
 function checkDeaths() {
   for (const p of state.party) {
@@ -711,8 +763,9 @@ function restoreFromSeed() {
   state.enemyIndex = 0;
   state.party = deepClone(state.battleSeed.party);
   clampSelectedPartyIndex();
-  state.mobs = deepClone(state.battleSeed.mobs);
+  state.mobs = deepClone(state.battleSeed.mobs).map(m => ({ ...m, dead: false, health: m.maxHealth }));
   state.log = [];
+  state.latestRoll = { rolls: [], successes: 0, successMask: [] };
   pushLog(`=== Combat restarted (${nowStamp()}) ===`);
   pushLog(`--- Round 1 (Party turn) ---`);
   return true;
@@ -733,10 +786,8 @@ function nextTurnIfNeeded() {
   } else {
     if (livingMobs().length === 0) { checkEnd(); return; }
 
-    while (state.enemyIndex < state.mobs.length && (state.mobs[state.enemyIndex].dead || state.mobs[state.enemyIndex].health <= 0)) {
-      state.enemyIndex++;
-    }
-    if (state.enemyIndex >= state.mobs.length) {
+    clampEnemyIndex();
+    if (state.enemyIndex >= state.mobs.length || (state.mobs[state.enemyIndex]?.dead || state.mobs[state.enemyIndex]?.health <= 0)) {
       state.turn = "party";
       state.round += 1;
       state.enemyIndex = 0;
@@ -760,6 +811,7 @@ function partyAttack(attackerIdx, targetIdx) {
   const { dice: diceCount } = getEffectiveFightingDice(attacker);
 
   const { rolls, hits } = computeAttackHits(diceCount, target.defTarget);
+  recordLatestRoll({ rolls, target: target.defTarget });
 
   pushLog(`[Party] ${attacker.name} attacks ${target.name} | dice=${diceCount} rolls=${fmtDice(rolls)} vs Def ${target.defTarget}+ => hits=${hits}`);
   if (hits > 0) {
@@ -781,9 +833,7 @@ function partyAttack(attackerIdx, targetIdx) {
 function resolveOneEnemyAttack(victimIdx) {
   if (state.phase !== "combat" || state.turn !== "enemies") return;
 
-  while (state.enemyIndex < state.mobs.length && (state.mobs[state.enemyIndex].dead || state.mobs[state.enemyIndex].health <= 0)) {
-    state.enemyIndex++;
-  }
+  clampEnemyIndex();
   const mob = state.mobs[state.enemyIndex];
   if (!mob) {
     snapshot();
@@ -798,6 +848,7 @@ function resolveOneEnemyAttack(victimIdx) {
   snapshot();
 
   const { rolls, hits } = computeEnemyHits(mob.atkDice, mob.atkTarget);
+  recordLatestRoll({ rolls, target: mob.atkTarget });
   const auto = mob.auto || 0;
   const raw = hits + auto;
 
@@ -806,6 +857,7 @@ function resolveOneEnemyAttack(victimIdx) {
   if (raw > 0) {
     const effArmour = getEffectiveArmourScore(victim);
     const save = armourSaveRolls(effArmour, raw);
+    recordLatestRoll({ rolls: save.rolls, target: 4 });
     const final = Math.max(0, raw - save.saved);
 
     if (save.rolls.length) {
@@ -838,9 +890,8 @@ function resolveAllEnemyAttacks(victimIdx) {
       vidx = state.party.indexOf(live[0]);
     }
 
-    let tmp = state.enemyIndex;
-    while (tmp < state.mobs.length && (state.mobs[tmp].dead || state.mobs[tmp].health <= 0)) tmp++;
-    if (tmp >= state.mobs.length) {
+    clampEnemyIndex();
+    if (state.enemyIndex >= state.mobs.length || (state.mobs[state.enemyIndex]?.dead || state.mobs[state.enemyIndex]?.health <= 0)) {
       snapshot();
       nextTurnIfNeeded();
       renderAll();
@@ -889,6 +940,7 @@ function castSpell({ casterIdx, spellId, targets }) {
           continue;
         }
         const { rolls, hits } = computeAttackHits(step.fighting, mob.defTarget);
+        recordLatestRoll({ rolls, target: mob.defTarget });
         pushLog(`        Attack ${k+1}: vs ${mob.name} | dice=${step.fighting} rolls=${fmtDice(rolls)} vs Def ${mob.defTarget}+ => hits=${hits}`);
         if (hits > 0) {
           mob.health -= hits;
@@ -1469,6 +1521,8 @@ function renderControls() {
   $("roundPill").textContent = `Round: ${state.round}`;
   $("turnPill").textContent = `Turn: ${state.turn}`;
 
+  clampEnemyIndex();
+
   const inCombat = (state.phase === "combat");
   const partyTurn = (inCombat && state.turn === "party");
   const enemyTurn = (inCombat && state.turn === "enemies");
@@ -1522,6 +1576,7 @@ function renderControls() {
     const opt = document.createElement("option");
     opt.value = String(i);
     opt.textContent = `${m.name}${(m.dead || m.health <= 0) ? " (dead)" : ""}`;
+    opt.disabled = !!(m.dead || m.health <= 0);
     ec.appendChild(opt);
   }
   ec.value = String(Math.min(state.enemyIndex, Math.max(0, state.mobs.length - 1)));
@@ -1604,6 +1659,7 @@ function renderAll() {
   renderTables();
   renderControls();
   renderCodes();
+  renderLatestRoll();
   renderLog();
 }
 
@@ -1871,6 +1927,7 @@ function startOrRestartCombat() {
   state.round = 1;
   state.turn = "party";
   state.enemyIndex = 0;
+  state.latestRoll = { rolls: [], successes: 0, successMask: [] };
 
   normalizeForCombat();
   clearBattleBuffs(state.party);
