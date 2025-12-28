@@ -312,7 +312,6 @@ function describeItem(item, entry) {
   if (item.hands) details.push(item.hands === 2 ? "Two-handed" : "One-handed");
   if (item.type === "weapon") details.push("Weapon");
   if (item.type === "weapon") details.push(entry?.equipped ? "Equipped" : "Unequipped");
-  if (!mods.length && !item.hands && !item.type) details.push("No stat effect");
   if (item.countable) details.push(`Count: ${entry?.count || 1}`);
   return details.join(" • ");
 }
@@ -847,9 +846,6 @@ function clampSelectedPartyIndex() {
 
 function renderEditors() {
   const pe = $("partyEditor");
-  const openSpellCards = new Set(
-    Array.from(pe.querySelectorAll(".spell-card[open]")).map(el => el.getAttribute("data-hero") || "")
-  );
   pe.innerHTML = "";
   const addMemberBtn = $("addMember");
   if (addMemberBtn) addMemberBtn.disabled = state.party.length >= 4;
@@ -935,12 +931,12 @@ function renderEditors() {
       const item = getEquipmentItem(eq);
       const isWeapon = item?.type === "weapon";
       const itemLabel = escapeHtml(item?.name || eq.custom || "");
+      const detailText = item ? describeItem(item, eq) : (eq.custom ? "Custom item" : "No item");
       return `
       <div class="equip-row">
         <div class="row g-3 align-items-center">
           <div class="col-md-6">
-            <label class="form-label small">Item</label>
-            <input type="text" class="form-control form-control-sm" list="itemOptions" data-k="equipment" data-field="name" data-ei="${slot}" data-i="${state.selectedPartyIndex}" value="${itemLabel}" placeholder="Item name">
+            <input type="text" class="form-control form-control-sm" list="itemOptions" data-k="equipment" data-field="name" data-ei="${slot}" data-i="${state.selectedPartyIndex}" value="${itemLabel}" placeholder="Item name" aria-label="Item name">
           </div>
           ${item?.countable ? `
             <div class="col-sm-6 col-md-2">
@@ -949,18 +945,18 @@ function renderEditors() {
             </div>
           ` : ""}
           ${isWeapon ? `
-            <div class="col-sm-6 col-md-2">
+            <div class="col-sm-6 col-md-3">
               <div class="form-check mb-0">
                 <input class="form-check-input" type="checkbox" data-k="equipment" data-field="equipped" data-ei="${slot}" data-i="${state.selectedPartyIndex}" ${eq.equipped ? "checked" : ""} id="equip-${state.selectedPartyIndex}-${slot}">
                 <label class="form-check-label small" for="equip-${state.selectedPartyIndex}-${slot}">Equipped</label>
               </div>
             </div>
           ` : ""}
-          <div class="col-sm-6 col-md-2 text-end">
+          <div class="col-sm-6 col-md-3 d-flex justify-content-end align-items-center">
             <button class="btn btn-outline-danger btn-sm" data-del-equipment="${slot}" data-i="${state.selectedPartyIndex}">Remove</button>
           </div>
         </div>
-        <div class="muted equip-help">${escapeHtml(item ? describeItem(item, eq) : (eq.custom ? "Custom item" : "No item"))}</div>
+        ${detailText ? `<div class="muted equip-help">${escapeHtml(detailText)}</div>` : ""}
       </div>
     `;
     }).join("");
@@ -979,20 +975,21 @@ function renderEditors() {
         : [];
       for (let i = 0; i < SPELL_SLOTS; i++) {
         const entry = knownSpells[i] || { id: "", status: "ready" };
+        const selectId = `spell-${state.selectedPartyIndex}-${i}-select`;
+        const chargedId = `spell-${state.selectedPartyIndex}-${i}-charged`;
         spellRows.push(`
           <div class="spell-row">
-            <label class="form-label mb-1">Spell ${i + 1}
-              <select data-k="spellId" data-si="${i}" data-i="${state.selectedPartyIndex}" class="form-select form-select-sm">
+            <div>
+              <label class="form-label mb-1" for="${selectId}">Spell ${i + 1}</label>
+              <select id="${selectId}" data-k="spellId" data-si="${i}" data-i="${state.selectedPartyIndex}" class="form-select form-select-sm">
                 <option value="">— None —</option>
                 ${SPELLS.map(sp => `<option value="${sp.id}" ${entry.id === sp.id ? "selected" : ""}>${escapeHtml(formatSpellOptionLabel(sp))}</option>`).join("")}
               </select>
-            </label>
-            <label class="form-label mb-1">Status
-              <select data-k="spellStatus" data-si="${i}" data-i="${state.selectedPartyIndex}" class="form-select form-select-sm">
-                <option value="ready" ${entry.status !== "exhausted" ? "selected" : ""}>Charged</option>
-                <option value="exhausted" ${entry.status === "exhausted" ? "selected" : ""}>Exhausted</option>
-              </select>
-            </label>
+            </div>
+            <div class="form-check mb-0 align-self-end">
+              <input class="form-check-input" type="checkbox" data-k="spellStatus" data-si="${i}" data-i="${state.selectedPartyIndex}" ${entry.status !== "exhausted" ? "checked" : ""} id="${chargedId}">
+              <label class="form-check-label" for="${chargedId}">Charged</label>
+            </div>
           </div>
         `);
       }
@@ -1002,19 +999,11 @@ function renderEditors() {
     sheet.className = "lk-party-sheet";
     sheet.innerHTML = `
       <div class="lk-sheet__header">
-        <div class="lk-sheet__topline">
-          <img src="${getHeroImage(p.name)}" alt="${escapeHtml(p.name)} portrait" class="lk-sheet__portrait">
-          <div>
-            <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-              <div>
-                <div class="lk-name-chip" aria-label="Character name">${escapeHtml(p.name)}</div>
-                <div class="lk-chipline">${statBadges}</div>
-              </div>
-              <div class="lk-sheet__cta">
-                <button class="btn btn-outline-secondary btn-sm" data-edit-stats="${state.selectedPartyIndex}">Edit stats</button>
-                <button class="btn btn-outline-danger btn-sm" data-del-party="${state.selectedPartyIndex}">Remove</button>
-              </div>
-            </div>
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+          <div class="stat-summary">${statBadges}</div>
+          <div class="lk-sheet__cta">
+            <button class="btn btn-outline-secondary btn-sm" data-edit-stats="${state.selectedPartyIndex}">Edit stats</button>
+            <button class="btn btn-outline-danger btn-sm" data-del-party="${state.selectedPartyIndex}">Remove</button>
           </div>
         </div>
       </div>
@@ -1043,13 +1032,9 @@ function renderEditors() {
                 <p class="lk-section-title mb-0">Spells</p>
                 <span class="text-secondary small">${spellRows.length} slots</span>
               </div>
-              <details class="spell-card" data-hero="${escapeHtml(p.name)}" ${openSpellCards.has(p.name) ? "open" : ""}>
-                <summary>
-                  <span>Known spells</span>
-                  <span class="spell-count text-secondary small">${spellRows.length} slots</span>
-                </summary>
+              <div class="spell-card">
                 <div class="spell-body">${spellRows.join("")}</div>
-              </details>
+              </div>
             </div>
           ` : ""}
         </div>
@@ -1212,7 +1197,8 @@ function onPartyEdit(e) {
     const slot = Number(el.getAttribute("data-si"));
     if (slot >= 0 && slot < SPELL_SLOTS) {
       const id = p.spells[slot]?.id || "";
-      p.spells[slot] = { id, status: el.value === "exhausted" ? "exhausted" : "ready" };
+      const charged = (el.type === "checkbox") ? !!el.checked : el.value !== "exhausted";
+      p.spells[slot] = { id, status: charged ? "ready" : "exhausted" };
     }
   }
 
