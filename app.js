@@ -1567,7 +1567,7 @@ function renderEditors() {
     renderAll();
   }));
   pe.querySelectorAll("button[data-edit-stats]").forEach(el => el.addEventListener("click", (e) => {
-    const i = Number(e.target.getAttribute("data-edit-stats"));
+    const i = Number(e.currentTarget?.getAttribute("data-edit-stats"));
     openStatsDialog(i);
   }));
   pe.querySelectorAll("button[data-del-party]").forEach(el => el.addEventListener("click", (e) => {
