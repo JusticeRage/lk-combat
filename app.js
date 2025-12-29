@@ -1089,14 +1089,23 @@ function resolveOneEnemyAttack(victimIdx) {
     return;
   }
 
-  const victim = state.party[victimIdx];
-  if (!victim || victim.dead || victim.health <= 0) return;
+  let victim = state.party[victimIdx];
+  if (!victim || victim.dead || victim.health <= 0) {
+    const live = livingParty();
+    if (!live.length) return;
+    victim = live[0];
+    victimIdx = state.party.indexOf(victim);
+  }
 
   snapshot();
 
   const { rolls, hits } = computeEnemyHits(mob.atkDice, mob.atkTarget);
   const auto = mob.auto || 0;
   const raw = hits + auto;
+
+  recordLatestRollGroups([
+    { rolls, target: mob.atkTarget, label: `${mob.name} attack` },
+  ]);
 
   pushLog(`[Enemy] ${mob.name} attacks ${victim.name} | rolls=${fmtDice(rolls)} vs ${mob.atkTarget}+ => hits=${hits}${auto ? ` + auto=${auto}` : ""} => damage=${raw}`);
 
@@ -2534,6 +2543,8 @@ function startOrRestartCombat() {
 function endPartyTurnManual() {
   if (state.phase !== "combat" || state.turn !== "party") return;
   snapshot();
+  checkDeaths();
+  if (checkEnd()) { renderAll(); return; }
   state.turn = "enemies";
   state.enemyIndex = 0;
   pushLog(`--- Enemies turn (Round ${state.round}) ---`);
