@@ -1,5 +1,5 @@
 export const ITEMS = [
-  { id: "brooch", name: "Brooch", modifiers: { charisma: 1 } },
+  { id: "handsome_brooch", name: "Handsome brooch", modifiers: { charisma: 1 } },
   { id: "prybar", name: "Prybar", modifiers: {} },
   { id: "iron_sceptre", name: "Iron Sceptre", modifiers: {} },
   { id: "fine_boots", name: "Fine Boots", modifiers: { stealth: 2 } },
@@ -9,6 +9,8 @@ export const ITEMS = [
   { id: "maul", name: "Maul", modifiers: { fighting: 1 }, hands: 2, type: "weapon" },
   { id: "hide_armour", name: "Hide Armour", modifiers: { armour: 1 } },
   { id: "reference_book", name: "Reference book", modifiers: { lore: 1 } },
+  { id: "warm_cloak", name: "Warm cloak", modifiers: { Survival: 1 } },
+  { id: "tome_of_knowledge", name: "Tome of knowledge", modifiers: { lore: 2 } },
   { id: "talisman_saint_elias", name: "Talisman of Saint Elias", modifiers: {} },
   { id: "engagement_ring", name: "Engagement Ring", modifiers: {} },
   { id: "glittering_necklace", name: "Glittering Necklace", modifiers: { charisma: 2 } },
@@ -17,6 +19,9 @@ export const ITEMS = [
   { id: "dragon_head", name: "Dragon head", modifiers: {} },
   { id: "steel_longsword", name: "Steel Longsword", modifiers: { fighting: 2 }, hands: 1, type: "weapon" },
   { id: "vial_of_poison", name: "Vial of poison", modifiers: {} },
+  { id: "iron_greataxe", name: "Iron Greataxe", modifiers: { fighting: 2 }, hands: 2, type: "weapon" },
+  { id: "steel_scimitar", name: "Steel Scimitar", modifiers: { fighting: 2 }, hands: 1, type: "weapon" },
+  { id: "soft_boots", name: "Soft Boots", modifiers: { stealth: 1 } },
 ];
 
 export function getItemById(id) {
