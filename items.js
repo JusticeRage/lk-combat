@@ -24,6 +24,7 @@ export const ITEMS = [
   { id: "steel_scimitar", name: "Steel Scimitar", modifiers: { fighting: 2 }, hands: 1, type: "weapon" },
   { id: "soft_boots", name: "Soft Boots", modifiers: { stealth: 1 } },
   { id: "hygliph_flower", name: "Hygliph flower", modifiers: {} },
+  { id: "bronze_locket", name: "Bronze Locket", modifiers: {} },
 ];
 
 export function getItemById(id) {
