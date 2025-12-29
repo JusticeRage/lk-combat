@@ -8,6 +8,7 @@ export const ITEMS = [
   { id: "crude_blade", name: "Crude Blade", modifiers: { fighting: 0 }, hands: 1, type: "weapon" },
   { id: "maul", name: "Maul", modifiers: { fighting: 1 }, hands: 2, type: "weapon" },
   { id: "hide_armour", name: "Hide Armour", modifiers: { armour: 1 } },
+  { id: "bone_armour", name: "Bone Armour", modifiers: { armour: 2 } },
   { id: "reference_book", name: "Reference book", modifiers: { lore: 1 } },
   { id: "warm_cloak", name: "Warm cloak", modifiers: { Survival: 1 } },
   { id: "tome_of_knowledge", name: "Tome of knowledge", modifiers: { lore: 2 } },
@@ -22,6 +23,7 @@ export const ITEMS = [
   { id: "iron_greataxe", name: "Iron Greataxe", modifiers: { fighting: 2 }, hands: 2, type: "weapon" },
   { id: "steel_scimitar", name: "Steel Scimitar", modifiers: { fighting: 2 }, hands: 1, type: "weapon" },
   { id: "soft_boots", name: "Soft Boots", modifiers: { stealth: 1 } },
+  { id: "hygliph_flower", name: "Hygliph flower", modifiers: {} },
 ];
 
 export function getItemById(id) {
