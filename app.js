@@ -926,13 +926,11 @@ const livingParty = () => state.party.filter(p => !p.dead && p.health > 0);
 const livingMobs = () => state.mobs.filter(m => !m.dead && m.health > 0);
 
 function clampEnemyIndex() {
-  while (state.enemyIndex < state.mobs.length && (state.mobs[state.enemyIndex].dead || state.mobs[state.enemyIndex].health <= 0)) {
+  while (
+    state.enemyIndex < state.mobs.length &&
+    (state.mobs[state.enemyIndex].dead || state.mobs[state.enemyIndex].health <= 0)
+  ) {
     state.enemyIndex++;
-  }
-
-  if (state.enemyIndex >= state.mobs.length) {
-    const next = state.mobs.findIndex(m => !m.dead && m.health > 0);
-    state.enemyIndex = next >= 0 ? next : 0;
   }
 }
 
