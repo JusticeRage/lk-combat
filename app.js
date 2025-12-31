@@ -1596,7 +1596,7 @@ function renderEditors() {
 
   pe.querySelectorAll("[data-k]").forEach(el => el.addEventListener("change", onPartyEdit));
   pe.querySelectorAll("button[data-add-equipment]").forEach(el => el.addEventListener("click", (e) => {
-    const i = Number(e.target.getAttribute("data-add-equipment"));
+    const i = Number(e.currentTarget.getAttribute("data-add-equipment"));
     const p = state.party[i];
     if (!p) return;
     p.equipment = normalizeEquipmentList(p.equipment, { keepEmpty: true });
@@ -1606,25 +1606,30 @@ function renderEditors() {
     saveSetupToStorage(state);
     renderAll();
   }));
-  pe.querySelectorAll("button[data-del-equipment]").forEach(el => el.addEventListener("click", (e) => {
-    const i = Number(e.target.getAttribute("data-i"));
-    const slot = Number(e.target.getAttribute("data-del-equipment"));
-    const p = state.party[i];
-    if (!p) return;
-    p.equipment = normalizeEquipmentList(p.equipment, { keepEmpty: true });
-    if (slot >=0 && slot < p.equipment.length) {
-      p.equipment.splice(slot, 1);
-    }
-    state.battleSeed = null;
-    saveSetupToStorage(state);
-    renderAll();
-  }));
+  pe.querySelectorAll("button[data-del-equipment]").forEach(el =>
+    el.addEventListener("click", (e) => {
+      const btn = e.currentTarget; // always the button
+      const i = Number(btn.getAttribute("data-i"));
+      const slot = Number(btn.getAttribute("data-del-equipment"));
+
+      const p = state.party[i];
+      if (!p) return;
+
+      p.equipment = normalizeEquipmentList(p.equipment, { keepEmpty: true });
+      if (slot >= 0 && slot < p.equipment.length) p.equipment.splice(slot, 1);
+
+      state.battleSeed = null;
+      saveSetupToStorage(state);
+      renderAll();
+    })
+  );
+
   pe.querySelectorAll("button[data-edit-stats]").forEach(el => el.addEventListener("click", (e) => {
     const i = Number(e.currentTarget?.getAttribute("data-edit-stats"));
     openStatsDialog(i);
   }));
   pe.querySelectorAll("button[data-del-party]").forEach(el => el.addEventListener("click", (e) => {
-    const i = Number(e.target.getAttribute("data-del-party"));
+    const i = Number(e.currentTarget.getAttribute("data-del-party"));
     state.party.splice(i, 1);
     clampSelectedPartyIndex();
     state.battleSeed = null;
@@ -1634,7 +1639,7 @@ function renderEditors() {
 
   me.querySelectorAll("input,select").forEach(el => el.addEventListener("change", onMobEdit));
   me.querySelectorAll("button[data-del-mob]").forEach(el => el.addEventListener("click", (e) => {
-    const i = Number(e.target.getAttribute("data-del-mob"));
+    const i = Number(e.currentTarget.getAttribute("data-del-mob"));
     state.mobs.splice(i, 1);
     state.battleSeed = null;
     saveSetupToStorage(state);
