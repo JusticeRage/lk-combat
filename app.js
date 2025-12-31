@@ -2686,6 +2686,9 @@ function initUI() {
     $("skillImportText").value = "";
     bsModalShow("skillImportDialog");
   });
+  $("skillImportDialog").addEventListener("shown.bs.modal", () => {
+    $("skillImportText").focus();
+  });
   $("skillImportCancel").addEventListener("click", () => bsModalHide("skillImportDialog"));
   $("skillImportOk").addEventListener("click", () => {
     try {
@@ -2719,6 +2722,9 @@ function initUI() {
     $("armyImportError").textContent = "";
     $("armyImportText").value = "";
     bsModalShow("armyImportDialog");
+  });
+  $("armyImportDialog").addEventListener("shown.bs.modal", () => {
+    $("armyImportText").focus();
   });
   $("armyImportCancel").addEventListener("click", () => bsModalHide("armyImportDialog"));
   $("armyImportOk").addEventListener("click", () => {
@@ -2791,6 +2797,9 @@ function initUI() {
     $("importError").textContent = "";
     $("importText").value = "";
     bsModalShow("importDialog");
+  });
+  $("importDialog").addEventListener("shown.bs.modal", () => {
+    $("importText").focus();
   });
   $("importCancel").addEventListener("click", () => bsModalHide("importDialog"));
   $("importOk").addEventListener("click", () => {
