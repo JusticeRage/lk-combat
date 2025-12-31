@@ -362,7 +362,7 @@ function normalizeEquipmentEntry(raw) {
   const item = getItemById(base.id);
   let equipped = (raw.equipped === null || raw.equipped === undefined) ? null : !!raw.equipped;
   if (equipped === null) {
-    equipped = item?.type === "weapon" ? true : false;
+    equipped = item?.type === "weapon" || item?.type === "wearable";
   }
   return {
     id: base.id,
@@ -392,21 +392,46 @@ function getEquipmentItem(entry) {
 }
 
 function getEquipmentModifiers(member) {
-  const mods = { fighting: 0, stealth: 0, lore: 0, survival: 0, charisma: 0, armour: 0 };
-  const equipment = Array.isArray(member?.equipment) ? member.equipment : [];
-  for (const raw of equipment) {
+  enforceSingleWearable(member);
+
+  const mods = {};
+  const maxMods = {}; // non-armour stats: keep best only
+
+  for (const raw of (member.equipment || [])) {
     const entry = normalizeEquipmentEntry(raw);
     const item = getEquipmentItem(entry);
     if (!item) continue;
-    const requiresEquipped = item.type === "weapon" || !!item.hands;
+
+    // items that must be equipped to apply modifiers
+    const requiresEquipped =
+    item.type === "weapon" ||
+    item.type === "wearable" ||
+    !!item.hands;
+
     if (requiresEquipped && !entry.equipped) continue;
-    const stack = item.countable ? Math.max(1, entry.count || 1) : 1;
-    for (const [k, v] of Object.entries(item.modifiers || {})) {
-      mods[k] = (mods[k] || 0) + (Number(v) || 0) * stack;
+
+    const stack = item.countable ? (entry.count || 1) : 1;
+
+    for (const [stat, rawValue] of Object.entries(item.modifiers || {})) {
+      const value = (Number(rawValue) || 0) * stack;
+
+      if (stat === "armour") {
+        // armour stacks (but only one wearable can contribute because of the rule above)
+        mods.armour = (mods.armour || 0) + value;
+      } else {
+        // only the single largest bonus per stat applies
+        maxMods[stat] = Math.max(maxMods[stat] ?? -Infinity, value);
+      }
     }
   }
+
+  for (const [stat, value] of Object.entries(maxMods)) {
+    if (value !== -Infinity) mods[stat] = value;
+  }
+
   return mods;
 }
+
 
 function enforceWeaponHandLimit(member) {
   if (!Array.isArray(member?.equipment)) return;
@@ -423,6 +448,23 @@ function enforceWeaponHandLimit(member) {
         handsUsed += hands;
       }
     }
+    return entry;
+  });
+}
+
+function enforceSingleWearable(member) {
+  if (!Array.isArray(member?.equipment)) return;
+
+  let worn = false;
+
+  member.equipment = member.equipment.map(raw => {
+    const entry = normalizeEquipmentEntry(raw);
+    const item = getEquipmentItem(entry);
+
+    if (!item || item.type !== "wearable" || !entry.equipped) return entry;
+
+    if (worn) entry.equipped = false;
+    worn = true;
     return entry;
   });
 }
@@ -1319,13 +1361,17 @@ function renderEditors() {
   } else {
     const p = state.party[state.selectedPartyIndex];
     enforceWeaponHandLimit(p);
+    enforceSingleWearable(p);
     const equipment = normalizeEquipmentList(p.equipment, { keepEmpty: true });
 
     const equipmentRows = equipment.map((eqRaw, slot) => {
       const eq = normalizeEquipmentEntry(eqRaw);
       const item = getEquipmentItem(eq);
       const isWeapon = item?.type === "weapon";
-      const requiresEquipped = isWeapon || !!item?.hands;
+      const requiresEquipped =
+        item?.type === "weapon" ||
+        item?.type === "wearable" ||
+        !!item?.hands;
       const itemLabel = escapeHtml(item?.name || eq.custom || "");
       const detailText = item ? describeItem(item, eq) : (eq.custom ? "Custom item" : "No item");
       const spells = Array.isArray(eq.spells) ? eq.spells.filter(Boolean) : [];
