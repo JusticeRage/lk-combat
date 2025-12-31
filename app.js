@@ -2866,33 +2866,34 @@ function initUI() {
   $("damagePartyDialog").addEventListener("shown.bs.modal", () => {
     $("damagePartyAmount").focus();
   });
-  $("healPartyOk").addEventListener("click", () => {
-    const amt = Number($("healPartyAmount").value) || 1;
-
-    for (const p of state.party) {
-      if (typeof p.hp !== "number") continue;
-      const maxHp = typeof p.maxHp === "number" ? p.maxHp : p.hp;
-      p.hp = Math.min(maxHp, p.hp + amt);
-    }
-
-    saveSetupToStorage(state);
-    bsModalHide("healPartyDialog");
-    renderAll();
-  });
   $("damagePartyOk").addEventListener("click", () => {
     const amt = Number($("damagePartyAmount").value) || 1;
 
     for (const p of state.party) {
-      if (typeof p.hp !== "number") continue;
-      p.hp = Math.max(0, p.hp - amt);
+      const hp = Number(p.hp);
+      if (!Number.isFinite(hp)) continue;
+      p.hp = Math.max(0, hp - amt);
     }
 
     saveSetupToStorage(state);
     bsModalHide("damagePartyDialog");
     renderAll();
   });
+  $("healPartyOk").addEventListener("click", () => {
+    const amt = Number($("healPartyAmount").value) || 1;
 
+    for (const p of state.party) {
+      const hp = Number(p.hp);
+      if (!Number.isFinite(hp)) continue;
+      const maxHpNum = Number(p.maxHp);
+      const maxHp = Number.isFinite(maxHpNum) ? maxHpNum : hp;
+      p.hp = Math.min(maxHp, hp + amt);
+    }
 
+    saveSetupToStorage(state);
+    bsModalHide("healPartyDialog");
+    renderAll();
+  });
 }
 
 // --- Init ---
