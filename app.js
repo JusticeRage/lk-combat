@@ -2866,32 +2866,32 @@ function initUI() {
   $("damagePartyDialog").addEventListener("shown.bs.modal", () => {
     $("damagePartyAmount").focus();
   });
-  $("damagePartyOk").addEventListener("click", () => {
-    const amt = Number($("damagePartyAmount").value) || 1;
-
-    for (const p of state.party) {
-      const hp = Number(p.hp);
-      if (!Number.isFinite(hp)) continue;
-      p.hp = Math.max(0, hp - amt);
-    }
-
-    saveSetupToStorage(state);
-    bsModalHide("damagePartyDialog");
-    renderAll();
-  });
   $("healPartyOk").addEventListener("click", () => {
     const amt = Number($("healPartyAmount").value) || 1;
-
+    snapshot(); // enables Undo during combat
     for (const p of state.party) {
-      const hp = Number(p.hp);
+      if (p.dead) continue;  // Dead characters cannot be revived: do not heal them.
+      const hp = Number(p.health);
+      const maxHp = Number(p.maxHealth);
       if (!Number.isFinite(hp)) continue;
-      const maxHpNum = Number(p.maxHp);
-      const maxHp = Number.isFinite(maxHpNum) ? maxHpNum : hp;
-      p.hp = Math.min(maxHp, hp + amt);
+      const cap = Number.isFinite(maxHp) ? maxHp : hp;
+      p.health = Math.min(cap, hp + amt);
     }
-
     saveSetupToStorage(state);
     bsModalHide("healPartyDialog");
+    renderAll();
+  });
+  $("damagePartyOk").addEventListener("click", () => {
+    const amt = Number($("damagePartyAmount").value) || 1;
+    snapshot(); // enables Undo during combat
+    for (const p of state.party) {
+      const hp = Number(p.health);
+      if (!Number.isFinite(hp)) continue;
+      p.health = Math.max(0, hp - amt);
+    }
+    checkDeaths();
+    saveSetupToStorage(state);
+    bsModalHide("damagePartyDialog");
     renderAll();
   });
 }
