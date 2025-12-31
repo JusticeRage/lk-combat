@@ -102,6 +102,53 @@
       </div>
     </div>
 
+    <!-- Heal party -->
+    <div class="modal fade" id="healPartyDialog" tabindex="-1" aria-labelledby="healPartyDialogLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5 mb-0" id="healPartyDialogLabel">Heal party</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <label for="healPartyAmount" class="form-label">
+              Healing points: <span id="healPartyAmountLabel">1</span>
+            </label>
+            <input id="healPartyAmount" type="range" class="form-range" min="1" max="10" step="1" value="1">
+            <div class="text-body-secondary small">Applies to all party members (no armour).</div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" id="healPartyCancel" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-success" id="healPartyOk">Apply healing</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Party damage -->
+    <div class="modal fade" id="damagePartyDialog" tabindex="-1" aria-labelledby="damagePartyDialogLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5 mb-0" id="damagePartyDialogLabel">Party damage</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <label for="damagePartyAmount" class="form-label">
+              Damage points: <span id="damagePartyAmountLabel">1</span>
+            </label>
+            <input id="damagePartyAmount" type="range" class="form-range" min="1" max="10" step="1" value="1">
+            <div class="text-body-secondary small">Applies to all party members (no armour).</div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" id="damagePartyCancel" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-danger" id="damagePartyOk">Apply damage</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
     <!-- Encounter import -->
     <div class="modal fade" id="importDialog" tabindex="-1" aria-labelledby="importDialogLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -253,10 +300,15 @@ Successes Required: 4"></textarea>
         <div class="card shadow-sm">
           <div class="card-header d-flex align-items-center justify-content-between gap-2">
             <h2 class="h5 mb-0">Party (up to 4)</h2>
-            <div class="d-flex gap-2">
-              <button class="btn btn-primary btn-sm" id="addMember">Add member</button>
-              <button class="btn btn-link btn-sm" id="clearParty">Clear</button>
-            </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-primary btn-sm" id="addMember">Add member</button>
+                <button class="btn btn-success btn-sm" id="healParty">
+                  <i class="bi bi-plus-circle"></i> Heal party
+                </button>
+                <button class="btn btn-danger btn-sm" id="damageParty">
+                  <i class="bi bi-dash-circle"></i> Party damage
+                </button>
+              </div>
           </div>
               <div class="card-body">
               <div id="partyEditor" class="lk-party-editor"></div>

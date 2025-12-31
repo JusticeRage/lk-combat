@@ -2753,24 +2753,7 @@ function initUI() {
   }
 
   $("addMember").addEventListener("click", openHeroDialog);
-  $("clearParty").addEventListener("click", () => {
-    if (!confirm("Clear party setup and saved data?")) return;
-    state.party = [];
-    state.selectedPartyIndex = 0;
-    state.vault = [];
-    state.missionNotes = "";
-    state.battleSeed = null;
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      const obj = raw ? JSON.parse(raw) : {};
-      obj.party = [];
-      obj.vault = [];
-      obj.missionNotes = "";
-      localStorage.setItem(LS_KEY, JSON.stringify(obj));
-    } catch {}
-    saveSetupToStorage(state);
-    renderAll();
-  });
+
   $("addMob").addEventListener("click", () => {
     state.mobs.push(newMob());
     state.battleSeed = null;
@@ -2859,6 +2842,57 @@ function initUI() {
       $("spellError").style.display = "";
     }
   });
+
+  // Heal/damage party dialogs
+  $("healParty").addEventListener("click", () => {
+    $("healPartyAmount").value = "1";
+    $("healPartyAmountLabel").textContent = "1";
+    bsModalShow("healPartyDialog");
+  });
+  $("damageParty").addEventListener("click", () => {
+    $("damagePartyAmount").value = "1";
+    $("damagePartyAmountLabel").textContent = "1";
+    bsModalShow("damagePartyDialog");
+  });
+  $("healPartyAmount").addEventListener("input", (e) => {
+    $("healPartyAmountLabel").textContent = String(e.target.value);
+  });
+  $("damagePartyAmount").addEventListener("input", (e) => {
+    $("damagePartyAmountLabel").textContent = String(e.target.value);
+  });
+  $("healPartyDialog").addEventListener("shown.bs.modal", () => {
+    $("healPartyAmount").focus();
+  });
+  $("damagePartyDialog").addEventListener("shown.bs.modal", () => {
+    $("damagePartyAmount").focus();
+  });
+  $("healPartyOk").addEventListener("click", () => {
+    const amt = Number($("healPartyAmount").value) || 1;
+
+    for (const p of state.party) {
+      if (typeof p.hp !== "number") continue;
+      const maxHp = typeof p.maxHp === "number" ? p.maxHp : p.hp;
+      p.hp = Math.min(maxHp, p.hp + amt);
+    }
+
+    saveSetupToStorage(state);
+    bsModalHide("healPartyDialog");
+    renderAll();
+  });
+  $("damagePartyOk").addEventListener("click", () => {
+    const amt = Number($("damagePartyAmount").value) || 1;
+
+    for (const p of state.party) {
+      if (typeof p.hp !== "number") continue;
+      p.hp = Math.max(0, p.hp - amt);
+    }
+
+    saveSetupToStorage(state);
+    bsModalHide("damagePartyDialog");
+    renderAll();
+  });
+
+
 }
 
 // --- Init ---
