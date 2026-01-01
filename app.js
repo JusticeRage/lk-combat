@@ -58,7 +58,10 @@ const CODE_BOOKS = [
 const GARRISON_OPTIONS = [
   { value: "", label: "— None —" },
   { value: "Luutanesh", label: "Luutanesh" },
+  { value: "Cursus", label: "Cursus" },
 ];
+
+const FLEET_GOODS = ["Salt", "Crops", "Steel", "Spices", "Wine", "Slaves"];
 
 const STAT_LABELS = {
   fighting: "Fighting",
@@ -156,6 +159,13 @@ function normalizeGarrison(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeCargoGood(value) {
+  const match = typeof value === "string"
+    ? FLEET_GOODS.find(g => g.toLowerCase() === value.trim().toLowerCase())
+    : null;
+  return match || "";
+}
+
 function normalizeArmy(raw) {
   const base = { name: "", strength: 0, morale: 0, garrison: "" };
   if (!raw || typeof raw !== "object") return base;
@@ -170,6 +180,30 @@ function normalizeArmy(raw) {
 function normalizeArmies(list) {
   if (!Array.isArray(list)) return [];
   return list.map(normalizeArmy);
+}
+
+function normalizeFleet(raw) {
+  const base = { name: "", fighting: 0, health: 0, cargo: 0, garrison: "", cargoContents: [] };
+  if (!raw || typeof raw !== "object") return base;
+
+  const cargo = clampInt(raw.cargo, 0, 99, base.cargo);
+  let cargoContents = Array.isArray(raw.cargoContents) ? raw.cargoContents.map(normalizeCargoGood) : [];
+  while (cargoContents.length < cargo) cargoContents.push("");
+  if (cargoContents.length > cargo) cargoContents = cargoContents.slice(0, cargo);
+
+  return {
+    name: typeof raw.name === "string" ? raw.name.trim() : base.name,
+    fighting: clampInt(raw.fighting, 0, 999, base.fighting),
+    health: clampInt(raw.health, 0, 999, base.health),
+    cargo,
+    cargoContents,
+    garrison: normalizeGarrison(raw.garrison),
+  };
+}
+
+function normalizeFleets(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(normalizeFleet);
 }
 
 function bsModalShow(id) {
@@ -601,6 +635,7 @@ function saveSetupToStorage(state) {
   state.vault = normalizeVaultItems(state.vault);
   state.missionNotes = typeof state.missionNotes === "string" ? state.missionNotes : "";
   state.armies = normalizeArmies(state.armies);
+  state.fleets = normalizeFleets(state.fleets);
   const payload = {
     silverCoins: state.silverCoins || 0,
     vault: state.vault,
@@ -610,6 +645,14 @@ function saveSetupToStorage(state) {
       strength: a.strength,
       morale: a.morale,
       garrison: a.garrison,
+    })),
+    fleets: state.fleets.map(f => ({
+      name: f.name,
+      fighting: f.fighting,
+      health: f.health,
+      cargo: f.cargo,
+      cargoContents: f.cargoContents,
+      garrison: f.garrison,
     })),
     party: state.party.map(p => ({
       name: p.name,
@@ -659,6 +702,7 @@ function loadSetupFromStorage(state) {
     state.vault = normalizeVaultItems(obj.vault);
     state.missionNotes = typeof obj.missionNotes === "string" ? obj.missionNotes : "";
     state.armies = normalizeArmies(obj.armies);
+    state.fleets = normalizeFleets(obj.fleets);
 
     if (Array.isArray(obj.party)) {
       const seen = new Set();
@@ -832,6 +876,55 @@ function parseArmiesImport(text) {
   return armies;
 }
 
+function parseFleetsImport(text) {
+  const blocks = text
+    .replace(/\r/g, "")
+    .split("\n")
+    .reduce((acc, rawLine) => {
+      const line = rawLine.trim();
+      if (!line) {
+        if (acc.current.length) acc.blocks.push(acc.current.splice(0));
+        return acc;
+      }
+      acc.current.push(line);
+      return acc;
+    }, { blocks: [], current: [] });
+
+  if (blocks.current.length) blocks.blocks.push(blocks.current);
+
+  const fleets = blocks.blocks.map((lines, idx) => {
+    if (!lines.length) throw new Error(`Fleet block ${idx + 1} is empty.`);
+    const name = lines[0];
+    if (!name) throw new Error(`Fleet ${idx + 1} is missing a name.`);
+
+    const fightingLine = lines.find(l => /^fighting\b/i.test(l));
+    const healthLine = lines.find(l => /^health\b/i.test(l));
+    const cargoLine = lines.find(l => /^cargo\b/i.test(l));
+    const garrisonLine = lines.find(l => /^garrison\b/i.test(l));
+
+    if (!fightingLine || !healthLine || !cargoLine) {
+      throw new Error(`Fleet "${name}" needs Fighting, Health, and Cargo lines.`);
+    }
+
+    const fighting = Number(fightingLine.match(/fighting\s*:?\s*(\d+)/i)?.[1]);
+    const health = Number(healthLine.match(/health\s*:?\s*(\d+)/i)?.[1]);
+    const cargo = Number(cargoLine.match(/cargo\s*:?\s*(\d+)/i)?.[1]);
+
+    if (Number.isNaN(fighting) || Number.isNaN(health) || Number.isNaN(cargo)) {
+      throw new Error(`Could not read stats for "${name}".`);
+    }
+
+    const garrison = garrisonLine
+      ? garrisonLine.replace(/^garrison\s*:?/i, "").trim()
+      : "";
+
+    return normalizeFleet({ name, fighting, health, cargo, garrison });
+  });
+
+  if (!fleets.length) throw new Error("No fleets found.");
+  return fleets;
+}
+
 // --- State ---
 const state = {
   phase: "setup", // setup | combat | ended
@@ -842,6 +935,7 @@ const state = {
   vault: [],
   missionNotes: "",
   armies: [],
+  fleets: [],
   mobs: [],
   enemyIndex: 0,
   log: [],
@@ -2066,6 +2160,81 @@ function renderArmies() {
   list.innerHTML = rows.join("");
 }
 
+function renderFleets() {
+  const list = $("fleetList");
+  if (!list) return;
+
+  state.fleets = normalizeFleets(state.fleets);
+
+  if (!state.fleets.length) {
+    list.innerHTML = `<div class="lk-empty-sheet">No fleets yet. Add one to get started.</div>`;
+    return;
+  }
+
+  const rows = state.fleets.map((fleet, idx) => {
+    const options = [...GARRISON_OPTIONS];
+    const hasCustomGarrison = fleet.garrison && !options.some(opt => opt.value === fleet.garrison);
+    if (hasCustomGarrison) options.push({ value: fleet.garrison, label: fleet.garrison });
+    const garrisonOptions = options.map(opt => `
+      <option value="${escapeHtml(opt.value)}"${opt.value === fleet.garrison ? " selected" : ""}>${escapeHtml(opt.label)}</option>
+    `).join("");
+    const idBase = `fleet-${idx}`;
+
+    const cargoSlots = (fleet.cargoContents || []).map((good, cargoIdx) => {
+      const cargoOptions = [`<option value="">— Empty —</option>`,
+        ...FLEET_GOODS.map(entry => `<option value="${escapeHtml(entry)}"${entry === good ? " selected" : ""}>${escapeHtml(entry)}</option>`)
+      ].join("");
+      return `
+        <div class="col-sm-6 col-lg-4">
+          <label class="form-label" for="${idBase}-cargo-${cargoIdx}">Cargo ${cargoIdx + 1}</label>
+          <select class="form-select" id="${idBase}-cargo-${cargoIdx}" data-fleet-index="${idx}" data-fleet-cargo-index="${cargoIdx}">${cargoOptions}</select>
+        </div>
+      `;
+    }).join("");
+
+    const cargoManifest = fleet.cargo > 0 ? `
+      <div class="mt-2">
+        <div class="row g-2">${cargoSlots}</div>
+      </div>
+    ` : "";
+
+    return `
+      <div class="lk-army-row${idx < state.fleets.length - 1 ? " mb-2" : ""}">
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="${idBase}-name">Ship name</label>
+            <input type="text" class="form-control" id="${idBase}-name" data-fleet-field="name" data-fleet-index="${idx}" value="${escapeHtml(fleet.name)}" placeholder="Ship name">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label" for="${idBase}-fighting">⚔️ Fighting</label>
+            <input type="number" min="0" max="999" class="form-control" id="${idBase}-fighting" data-fleet-field="fighting" data-fleet-index="${idx}" value="${fleet.fighting}">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label" for="${idBase}-health">❤️ Health</label>
+            <input type="number" min="0" max="999" class="form-control" id="${idBase}-health" data-fleet-field="health" data-fleet-index="${idx}" value="${fleet.health}">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label" for="${idBase}-cargo">📦 Cargo units</label>
+            <input type="number" min="0" max="99" class="form-control" id="${idBase}-cargo" data-fleet-field="cargo" data-fleet-index="${idx}" value="${fleet.cargo}">
+          </div>
+          <div class="col-12 col-md-2">
+            <label class="form-label" for="${idBase}-garrison">🗺️ Garrison</label>
+            <select class="form-select" id="${idBase}-garrison" data-fleet-field="garrison" data-fleet-index="${idx}">${garrisonOptions}</select>
+          </div>
+          <div class="col-12 col-md-1 d-flex justify-content-md-end align-items-end">
+            <button type="button" class="btn btn-outline-danger btn-sm lk-icon-btn" data-fleet-remove="${idx}" aria-label="Remove fleet">
+              <i class="bi bi-trash" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+        ${cargoManifest}
+      </div>
+    `;
+  });
+
+  list.innerHTML = rows.join("");
+}
+
 function onArmyFieldChange(target) {
   const field = target.getAttribute("data-army-field");
   const idx = Number(target.getAttribute("data-army-index"));
@@ -2091,6 +2260,54 @@ function removeArmyAt(idx) {
   state.armies.splice(idx, 1);
   saveSetupToStorage(state);
   renderArmies();
+}
+
+function onFleetFieldChange(target) {
+  const field = target.getAttribute("data-fleet-field");
+  const idx = Number(target.getAttribute("data-fleet-index"));
+  const cargoIdx = target.getAttribute("data-fleet-cargo-index");
+  if ((field == null && cargoIdx == null) || Number.isNaN(idx)) return;
+
+  const fleet = state.fleets[idx];
+  if (!fleet) return;
+
+  let rerender = false;
+
+  if (cargoIdx != null) {
+    const slot = Number(cargoIdx);
+    if (!Number.isNaN(slot) && slot >= 0) {
+      fleet.cargoContents[slot] = normalizeCargoGood(target.value);
+      saveSetupToStorage(state);
+    }
+    return;
+  }
+
+  if (field === "name" || field === "garrison") {
+    fleet[field] = field === "garrison" ? normalizeGarrison(target.value) : target.value;
+  }
+
+  if (field === "fighting" || field === "health") {
+    fleet[field] = clampInt(target.value, 0, 999, fleet[field] || 0);
+    target.value = fleet[field];
+  }
+
+  if (field === "cargo") {
+    fleet.cargo = clampInt(target.value, 0, 99, fleet.cargo || 0);
+    while (fleet.cargoContents.length < fleet.cargo) fleet.cargoContents.push("");
+    if (fleet.cargoContents.length > fleet.cargo) fleet.cargoContents.length = fleet.cargo;
+    target.value = fleet.cargo;
+    rerender = true;
+  }
+
+  saveSetupToStorage(state);
+  if (rerender) renderFleets();
+}
+
+function removeFleetAt(idx) {
+  if (Number.isNaN(idx) || idx < 0 || idx >= state.fleets.length) return;
+  state.fleets.splice(idx, 1);
+  saveSetupToStorage(state);
+  renderFleets();
 }
 
 function renderCodes() {
@@ -2295,6 +2512,7 @@ function renderAll() {
   renderTables();
   renderControls();
   renderArmies();
+  renderFleets();
   renderCodes();
   renderSkillCheck();
   renderLatestRoll();
@@ -2730,7 +2948,7 @@ function initUI() {
   $("armyImportOk").addEventListener("click", () => {
     try {
       const armies = parseArmiesImport($("armyImportText").value || "");
-      state.armies = armies;
+      state.armies = normalizeArmies([...state.armies, ...armies]);
       saveSetupToStorage(state);
       bsModalHide("armyImportDialog");
       renderArmies();
@@ -2749,6 +2967,47 @@ function initUI() {
 
       const idx = Number(btn.getAttribute("data-army-remove"));
       if (!Number.isNaN(idx)) removeArmyAt(idx);
+    });
+  }
+
+  // Fleets
+  $("addFleet").addEventListener("click", () => {
+    state.fleets.push(normalizeFleet({}));
+    saveSetupToStorage(state);
+    renderFleets();
+  });
+  $("importFleets").addEventListener("click", () => {
+    $("fleetImportError").style.display = "none";
+    $("fleetImportError").textContent = "";
+    $("fleetImportText").value = "";
+    bsModalShow("fleetImportDialog");
+  });
+  $("fleetImportDialog").addEventListener("shown.bs.modal", () => {
+    $("fleetImportText").focus();
+  });
+  $("fleetImportCancel").addEventListener("click", () => bsModalHide("fleetImportDialog"));
+  $("fleetImportOk").addEventListener("click", () => {
+    try {
+      const fleets = parseFleetsImport($("fleetImportText").value || "");
+      state.fleets = normalizeFleets([...state.fleets, ...fleets]);
+      saveSetupToStorage(state);
+      bsModalHide("fleetImportDialog");
+      renderFleets();
+    } catch (e) {
+      $("fleetImportError").textContent = String(e?.message || e);
+      $("fleetImportError").style.display = "";
+    }
+  });
+  const fleetList = $("fleetList");
+  if (fleetList) {
+    fleetList.addEventListener("input", (e) => onFleetFieldChange(e.target));
+    fleetList.addEventListener("change", (e) => onFleetFieldChange(e.target));
+    fleetList.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-fleet-remove]");
+      if (!btn) return;
+
+      const idx = Number(btn.getAttribute("data-fleet-remove"));
+      if (!Number.isNaN(idx)) removeFleetAt(idx);
     });
   }
 

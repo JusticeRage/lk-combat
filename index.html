@@ -260,6 +260,34 @@ Successes Required: 4"></textarea>
       </div>
     </div>
 
+    <!-- Fleet import -->
+    <div class="modal fade" id="fleetImportDialog" tabindex="-1" aria-labelledby="fleetImportDialogLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5 mb-0" id="fleetImportDialogLabel">Import fleets</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="text-body-secondary small mb-2">
+              One fleet per block. Example:<br />
+              <span class="lk-pill">Cog</span><br />
+              <span class="lk-pill">Fighting 4</span><br />
+              <span class="lk-pill">Health 7</span><br />
+              <span class="lk-pill">Cargo 2 units</span>
+            </div>
+            <textarea id="fleetImportText" class="form-control lk-textarea" rows="10" spellcheck="false"
+                      placeholder="Cog\nFighting 4\nHealth 7\nCargo 2 units\n\nLongship\nFighting 6\nHealth 8\nCargo 1"></textarea>
+            <div id="fleetImportError" class="invalid-feedback d-block" style="display:none;"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" id="fleetImportCancel" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="fleetImportOk">Import fleets</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Tabs -->
     <ul class="nav nav-tabs mb-3" id="lkTabs" role="tablist">
       <li class="nav-item" role="presentation">
@@ -572,7 +600,7 @@ Successes Required: 4"></textarea>
         <div class="card shadow-sm">
           <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
             <div>
-              <h2 class="h5 mb-0">Armies &amp; Fleet</h2>
+              <h2 class="h5 mb-0">Armies</h2>
               <div class="text-body-secondary small">List and import armies.</div>
             </div>
             <div class="d-flex gap-2 flex-wrap justify-content-end">
@@ -582,6 +610,22 @@ Successes Required: 4"></textarea>
           </div>
           <div class="card-body">
             <div id="armyList" class="lk-army-list"></div>
+          </div>
+        </div>
+
+        <div class="card shadow-sm mt-3">
+          <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <div>
+              <h2 class="h5 mb-0">Fleets</h2>
+              <div class="text-body-secondary small">Manage ships, cargo, and garrisons.</div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap justify-content-end">
+              <button class="btn btn-outline-primary btn-sm" id="importFleets" type="button">Import fleets</button>
+              <button class="btn btn-primary btn-sm" id="addFleet" type="button">Add fleet</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="fleetList" class="lk-army-list"></div>
           </div>
         </div>
       </section>
