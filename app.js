@@ -977,6 +977,7 @@ function buildLatestRoll(groups) {
   const built = norm.map(entry => {
     const rolls = Array.isArray(entry?.rolls) ? entry.rolls : [];
     let successMask = Array.isArray(entry?.successMask) ? entry.successMask.map(Boolean) : [];
+    const includeInTotal = entry?.includeInTotal !== false;
 
     if (successMask.length !== rolls.length) {
       successMask = rolls.map((r, idx) => entry?.successPredicate
@@ -988,13 +989,14 @@ function buildLatestRoll(groups) {
       rolls: [...rolls],
       successes: successMask.filter(Boolean).length,
       successMask,
+      includeInTotal,
       label: entry?.label ? String(entry.label) : "",
     };
   });
 
   return {
     groups: built,
-    totalSuccesses: built.reduce((sum, g) => sum + (g.successes || 0), 0),
+    totalSuccesses: built.reduce((sum, g) => sum + ((g.includeInTotal !== false ? g.successes : 0) || 0), 0),
   };
 }
 
@@ -1274,7 +1276,7 @@ function resolveOneEnemyAttack(victimIdx) {
     const save = armourSaveRolls(effArmour, raw);
     recordLatestRollGroups([
       { rolls, target: mob.atkTarget, label: `${mob.name} attack` },
-      { rolls: save.rolls, target: 4, label: `${victim.name} armour save` },
+      { rolls: save.rolls, target: 4, label: `${victim.name} armour save`, includeInTotal: false },
     ]);
     const final = Math.max(0, raw - save.saved);
 
