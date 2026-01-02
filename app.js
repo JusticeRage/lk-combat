@@ -1863,12 +1863,10 @@ function renderEditors() {
             <p class="text-uppercase small text-secondary fw-semibold mb-1">👛  Party silver</p>
           </div>
           <div class="d-flex align-items-center gap-2 flex-wrap">
-            <div class="input-group input-group-sm" style="max-width: 260px;">
+            <div class="input-group input-group-sm" style="max-width: 320px;">
               <span class="input-group-text">Silver coins</span>
               <input type="number" class="form-control" min="0" max="999999"
                   data-k="silverCoins" value="${state.silverCoins || 0}" aria-label="Party silver coins">
-            </div>
-            <div class="btn-group btn-group-sm" role="group" aria-label="Adjust silver">
               <button type="button" class="btn btn-outline-secondary" data-silver-adjust="add" aria-label="Add silver">
                 <i class="bi bi-plus-circle"></i>
               </button>
