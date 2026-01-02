@@ -148,6 +148,30 @@
       </div>
     </div>
 
+    <!-- Adjust party silver -->
+    <div class="modal fade" id="silverDialog" tabindex="-1" aria-labelledby="silverDialogLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5 mb-0" id="silverDialogLabel">Adjust silver</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label" for="silverAdjustAmount" id="silverDialogPrompt">Silver to add</label>
+              <input id="silverAdjustAmount" type="number" class="form-control" min="0" max="999999" value="1">
+            </div>
+            <div class="text-body-secondary small" id="silverDialogHint"></div>
+            <div class="invalid-feedback d-block" id="silverDialogError" style="display:none;"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" id="silverAdjustCancel" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="silverAdjustOk">Apply</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
 
     <!-- Encounter import -->
     <div class="modal fade" id="importDialog" tabindex="-1" aria-labelledby="importDialogLabel" aria-hidden="true">
