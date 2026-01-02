@@ -344,6 +344,12 @@ Successes Required: 4"></textarea>
           Codes
         </button>
       </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="mapTabBtn" data-bs-toggle="tab" data-bs-target="#mapTab"
+                type="button" role="tab" aria-controls="mapTab" aria-selected="false">
+          Maps
+        </button>
+      </li>
     </ul>
 
     <div class="tab-content">
@@ -664,6 +670,25 @@ Successes Required: 4"></textarea>
             <div class="lk-code-layout">
               <div id="codeBookTabs" class="lk-code-tabs" role="tablist" aria-label="Code books"></div>
               <div id="codeGrid" class="mt-3 mt-lg-0"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Maps -->
+      <section id="mapTab" class="tab-pane fade" role="tabpanel" aria-labelledby="mapTabBtn" tabindex="0">
+        <div class="card shadow-sm">
+          <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <h2 class="h5 mb-0">Maps</h2>
+            <div class="d-flex align-items-center gap-2">
+              <label class="form-label mb-0 small" for="mapZoom">Zoom: <span id="mapZoomLabel">100%</span></label>
+              <input type="range" class="form-range" id="mapZoom" min="50" max="200" step="10" value="100">
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="lk-map-layout">
+              <div id="mapBookTabs" class="lk-map-tabs" role="tablist" aria-label="Map books"></div>
+              <div id="mapViewer"></div>
             </div>
           </div>
         </div>
