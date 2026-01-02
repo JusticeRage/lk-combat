@@ -110,6 +110,7 @@ const createDefaultSeaCombat = () => ({
   selectedFleetIndex: 0,
   player: { name: "", fighting: 0, health: 0, maxHealth: 0 },
   enemy: { name: "Enemy ship", fighting: 4, health: 8, maxHealth: 8 },
+  startedAt: null,
   turn: "player",
   allowSpell: true,
   log: [],
@@ -278,6 +279,7 @@ function normalizeSeaCombat(raw) {
     phase: ["setup", "active", "ended"].includes(raw.phase) ? raw.phase : base.phase,
     selectedFleetIndex: clampInt(raw.selectedFleetIndex, 0, Math.max(0, (state?.fleets?.length || 0) - 1), 0),
     allowSpell: typeof raw.allowSpell === "boolean" ? raw.allowSpell : base.allowSpell,
+    startedAt: typeof raw.startedAt === "string" ? raw.startedAt : base.startedAt,
     turn: raw.turn === "enemy" ? "enemy" : base.turn,
     selectedCaster: typeof raw.selectedCaster === "string" ? raw.selectedCaster : base.selectedCaster,
     selectedSpellId: typeof raw.selectedSpellId === "string" ? raw.selectedSpellId : base.selectedSpellId,
@@ -292,11 +294,13 @@ function normalizeSeaCombat(raw) {
 
   const player = normalizeSeaShip(raw.player);
   const enemy = normalizeSeaShip(raw.enemy);
+  const enemyMaxHealth = enemy.maxHealth || base.enemy.maxHealth;
+  const enemyHealth = clampInt(raw.enemy?.health ?? enemy.health ?? enemyMaxHealth, 0, enemyMaxHealth, enemyMaxHealth);
   normalized.player = player;
   normalized.enemy = {
     ...enemy,
-    maxHealth: enemy.maxHealth || base.enemy.maxHealth,
-    health: clampInt(enemy.health || enemy.maxHealth || base.enemy.maxHealth, 0, enemy.maxHealth || base.enemy.maxHealth, enemy.maxHealth || base.enemy.maxHealth),
+    maxHealth: enemyMaxHealth,
+    health: enemyHealth,
   };
 
   return normalized;
@@ -785,6 +789,7 @@ function saveSetupToStorage(state) {
   state.fleets = normalizeFleets(state.fleets);
   state.seaCombat = normalizeSeaCombat(state.seaCombat);
   const payload = {
+    battleStartedAt: state.battleStartedAt,
     silverCoins: state.silverCoins || 0,
     vault: state.vault,
     missionNotes: state.missionNotes,
@@ -853,6 +858,7 @@ function loadSetupFromStorage(state) {
     state.selectedCodeBook = normalizeBookKey(obj.selectedCodeBook);
     state.selectedMapBook = normalizeBookKey(obj.selectedMapBook);
     state.mapZoom = clampInt(obj.mapZoom, MAP_ZOOM_MIN, MAP_ZOOM_MAX, MAP_ZOOM_DEFAULT);
+    state.battleStartedAt = typeof obj.battleStartedAt === "string" ? obj.battleStartedAt : null;
 
     state.silverCoins = clampInt(obj.silverCoins, 0, 999999, 0);
     state.vault = normalizeVaultItems(obj.vault);
@@ -1106,6 +1112,7 @@ const state = {
   phase: "setup", // setup | combat | ended
   round: 1,
   turn: "party", // party | enemies
+  battleStartedAt: null,
   party: [],
   silverCoins: 0,
   vault: [],
@@ -2491,10 +2498,18 @@ function renderFleets() {
 
     const statLine = `
       <div class="d-flex flex-wrap gap-3 align-items-center">
-        <div class="lk-stat-label mb-0">⚔️ Fighting</div>
-        <div class="lk-stat-value">${fleet.fighting || 0}</div>
-        <div class="lk-stat-label mb-0">🗺️ Harbour</div>
-        <div class="lk-stat-value">${harbourLabel}</div>
+        <div class="d-flex align-items-center gap-2">
+          <div class="lk-stat-label mb-0">⚔️ Fighting</div>
+          <div class="lk-stat-value">${fleet.fighting || 0}</div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="lk-stat-label mb-0">Cargo manifest</div>
+          <div class="d-flex flex-wrap gap-2">${cargoText}</div>
+        </div>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+          <div class="lk-stat-label mb-0">🗺️ Harbour</div>
+          <div class="lk-stat-value">${harbourLabel}</div>
+        </div>
       </div>
     `;
 
@@ -2502,10 +2517,7 @@ function renderFleets() {
       <div class="lk-army-row${idx < state.fleets.length - 1 ? " mb-2" : ""}">
         <div class="d-flex flex-column gap-3">
           <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
-            <div>
-              <div class="fw-semibold">${shipName}</div>
-              <div class="text-body-secondary small">${harbourLabel}</div>
-            </div>
+            <div class="fw-semibold">${shipName}</div>
             <div class="d-flex gap-2">
               <button type="button" class="btn btn-outline-secondary btn-sm lk-icon-btn" data-fleet-edit="${idx}" aria-label="Edit fleet">
                 <i class="bi bi-pencil" aria-hidden="true"></i>
@@ -2519,10 +2531,6 @@ function renderFleets() {
             <div class="col-12 col-lg-4">${hpBar}</div>
             <div class="col-12 col-lg-8 d-flex flex-column gap-2">
               ${statLine}
-              <div class="d-flex flex-wrap gap-2 align-items-center">
-                <div class="lk-stat-label mb-0">Cargo manifest</div>
-                <div class="d-flex flex-wrap gap-2">${cargoText}</div>
-              </div>
             </div>
           </div>
         </div>
@@ -2773,7 +2781,9 @@ function startSeaCombat() {
   state.seaCombat.phase = "active";
   state.seaCombat.turn = "player";
   state.seaCombat.allowSpell = true;
-  state.seaCombat.log = [`=== Sea combat started (${nowStamp()}) ===`];
+  const seaStart = state.seaCombat.startedAt || nowStamp();
+  state.seaCombat.startedAt = null;
+  state.seaCombat.log = [`=== Sea combat started (${seaStart}) ===`];
   state.seaCombat.latestRoll = { groups: [], totalSuccesses: 0 };
   state.seaCombat.spellsUsed = {};
   state.seaCombat.player = {
@@ -3857,8 +3867,11 @@ function startOrRestartCombat() {
   seedBattleState();
 
   state.log = [];
-  pushLog(`=== Combat started (${nowStamp()}) ===`);
+  const battleStart = state.battleStartedAt || nowStamp();
+  state.battleStartedAt = null;
+  pushLog(`=== Combat started (${battleStart}) ===`);
   pushLog(`--- Round 1 (Party turn) ---`);
+  saveSetupToStorage(state);
   renderAll();
 }
 
@@ -4147,6 +4160,7 @@ function initUI() {
       state.seaCombat.encounters = encounters;
       if (encounters[0]) {
         state.seaCombat.enemy = { ...encounters[0], health: encounters[0].maxHealth || encounters[0].health };
+        state.seaCombat.startedAt = nowStamp();
         state.seaCombat.phase = "setup";
       }
       saveSetupToStorage(state);
@@ -4176,6 +4190,13 @@ function initUI() {
     if (!confirm("Clear opponents and saved data?")) return;
     state.mobs = [];
     state.battleSeed = null;
+    state.battleStartedAt = null;
+    state.phase = "setup";
+    state.round = 1;
+    state.turn = "party";
+    state.enemyIndex = 0;
+    state.log = [];
+    state.latestRoll = { groups: [], totalSuccesses: 0 };
     try {
       const raw = localStorage.getItem(LS_KEY);
       const obj = raw ? JSON.parse(raw) : {};
@@ -4200,7 +4221,14 @@ function initUI() {
   $("importOk").addEventListener("click", () => {
     try {
       state.mobs = parseEncounterText($("importText").value || "");
+      state.battleStartedAt = nowStamp();
       state.battleSeed = null;
+      state.phase = "setup";
+      state.round = 1;
+      state.turn = "party";
+      state.enemyIndex = 0;
+      state.log = [];
+      state.latestRoll = { groups: [], totalSuccesses: 0 };
       saveSetupToStorage(state);
       bsModalHide("importDialog");
       renderAll();
