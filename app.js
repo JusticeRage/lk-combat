@@ -289,11 +289,27 @@ function createDefaultMassCombat() {
     currentZone: 0,
     winner: null,
     startedAt: null,
+    spellsUsed: {},
+    selectedCaster: "",
+    selectedSpellId: "",
+    selectedTarget: "",
   };
 }
 
 function normalizeMassCombat(raw) {
   if (!raw || typeof raw !== "object") return createDefaultMassCombat();
+  const normalizeSpellUsage = (usage) => {
+    const result = {};
+    if (!usage || typeof usage !== "object") return result;
+    for (const [caster, spells] of Object.entries(usage)) {
+      if (!spells || typeof spells !== "object") continue;
+      result[caster] = {};
+      for (const spellId of Object.keys(spells)) {
+        if (spellId) result[caster][spellId] = true;
+      }
+    }
+    return result;
+  };
   return {
     phase: ["placement", "active", "ended"].includes(raw.phase) ? raw.phase : "placement",
     deployment: normalizeMassZones(raw.deployment),
@@ -303,6 +319,10 @@ function normalizeMassCombat(raw) {
     currentZone: clampInt(raw.currentZone, 0, MASS_ZONE_ORDER.length - 1, 0),
     winner: raw.winner === "player" || raw.winner === "enemy" ? raw.winner : null,
     startedAt: typeof raw.startedAt === "string" ? raw.startedAt : null,
+    spellsUsed: normalizeSpellUsage(raw.spellsUsed),
+    selectedCaster: typeof raw.selectedCaster === "string" ? raw.selectedCaster : "",
+    selectedSpellId: typeof raw.selectedSpellId === "string" ? raw.selectedSpellId : "",
+    selectedTarget: typeof raw.selectedTarget === "string" ? raw.selectedTarget : "",
   };
 }
 
@@ -503,6 +523,7 @@ const formatSpellTargetMode = (mode) => {
     multiEnemyDistinct: "Different enemies",
     singleAlly: "Single ally",
     allEnemies: "All enemies",
+    singleEnemyUnit: "Enemy unit",
   };
   return map[mode] || mode;
 };
@@ -537,6 +558,9 @@ function summarizeSpellEffect(spell) {
     }
     if (step.type === "healFixed") {
       return `Heal ${step.amount || 0} HP.`;
+    }
+    if (step.type === "massReduceMorale") {
+      return `Reduce the target unit's Morale by ${step.amount || 0}.`;
     }
     return "A strange magical effect occurs.";
   };
@@ -3389,6 +3413,189 @@ function renderMassLatestRoll() {
   });
 }
 
+function getMassSpellTargets() {
+  const zones = state.massCombat?.zones || createEmptyMassZones();
+  const targets = [];
+  MASS_ZONE_ORDER.forEach(zoneKey => {
+    ["front", "support"].forEach(slot => {
+      const unit = zones?.[zoneKey]?.enemy?.[slot];
+      if (unit) {
+        targets.push({
+          value: `${zoneKey}|enemy|${slot}`,
+          label: `${unit.name || "Enemy unit"} — ${MASS_ZONE_LABELS[zoneKey]} (${slot === "front" ? "Front" : "Support"})`,
+        });
+      }
+    });
+  });
+  return targets;
+}
+
+function canCastMassSpell(caster, spell) {
+  const mc = state.massCombat;
+  const spellWindowOpen = mc.phase === "active" && !mc.winner && MASS_ZONE_ORDER[mc.currentZone] === "left";
+  if (!spellWindowOpen) return { ok: false, reason: "Spells can be cast before the Left flank clash only." };
+  if (!caster || caster.dead || caster.health <= 0) return { ok: false, reason: "Caster unavailable." };
+  const known = findKnownSpell(caster, spell.id);
+  if (!known) return { ok: false, reason: "Spell is not prepared." };
+  if (known.status === "exhausted") return { ok: false, reason: "Spell is exhausted." };
+  if (spell.type !== "mass_combat") return { ok: false, reason: "This spell cannot be used in mass combat." };
+  const alreadyUsed = mc.spellsUsed?.[caster.name]?.[spell.id];
+  if (spell.oncePerBattle && alreadyUsed) return { ok: false, reason: "Spell already used this battle." };
+  return { ok: true, reason: "" };
+}
+
+function castMassSpell() {
+  state.massCombat = normalizeMassCombat(state.massCombat);
+  const casterName = $("massCaster")?.value;
+  const spellId = $("massSpell")?.value;
+  const targetKey = $("massSpellTarget")?.value;
+  const mc = state.massCombat;
+
+  const caster = state.party.find(p => p.name === casterName);
+  const spell = getSpellById(spellId);
+  if (!caster || !spell) return;
+
+  const chk = canCastMassSpell(caster, spell);
+  if (!chk.ok) {
+    pushMassLog(`(!) Cannot cast ${spell.name}: ${chk.reason}`);
+    renderMassSpellControls();
+    return;
+  }
+
+  const [zoneKey, side, slot] = (targetKey || "").split("|");
+  const targetUnit = mc.zones?.[zoneKey]?.[side]?.[slot];
+  if (!targetUnit) {
+    pushMassLog("(!) Select a valid enemy unit to target.");
+    renderMassSpellControls();
+    return;
+  }
+
+  pushMassLog(`[Spell] ${caster.name} casts ${spell.name} on ${targetUnit.name || "enemy unit"}.`);
+
+  for (const step of spell.steps || []) {
+    if (step.type === "massReduceMorale") {
+      const before = targetUnit.morale;
+      const amount = Math.max(0, step.amount || 0);
+      targetUnit.morale = Math.max(0, targetUnit.morale - amount);
+      pushMassLog(`  Morale drops from ${before} to ${targetUnit.morale}.`);
+    }
+  }
+
+  if (!mc.spellsUsed[caster.name]) mc.spellsUsed[caster.name] = {};
+  mc.spellsUsed[caster.name][spell.id] = true;
+  const known = findKnownSpell(caster, spell.id);
+  if (known) known.status = "exhausted";
+
+  saveSetupToStorage(state);
+  renderMassSpellControls();
+  renderMassCombat();
+}
+
+function renderMassSpellControls() {
+  const casterSel = $("massCaster");
+  const spellSel = $("massSpell");
+  const targetSel = $("massSpellTarget");
+  const hint = $("massSpellHint");
+  const castBtn = $("massCastSpell");
+  if (!casterSel || !spellSel || !targetSel || !hint || !castBtn) return;
+
+  state.massCombat = normalizeMassCombat(state.massCombat);
+  const mc = state.massCombat;
+  const spellWindowOpen = mc.phase === "active" && !mc.winner && MASS_ZONE_ORDER[mc.currentZone] === "left";
+
+  const casters = state.party.filter(p => isSpellcaster(p.name) && !p.dead && p.health > 0);
+  casterSel.innerHTML = "";
+  if (!casters.length) {
+    const opt = document.createElement("option");
+    opt.textContent = "No spellcasters";
+    opt.disabled = true;
+    casterSel.appendChild(opt);
+    casterSel.disabled = true;
+    spellSel.innerHTML = "";
+    spellSel.disabled = true;
+    targetSel.innerHTML = "";
+    targetSel.disabled = true;
+    castBtn.disabled = true;
+    hint.textContent = "Add a spellcaster to use mass combat spells.";
+    return;
+  }
+
+  casterSel.disabled = false;
+  for (const c of casters) {
+    const opt = document.createElement("option");
+    opt.value = c.name;
+    opt.textContent = c.name;
+    casterSel.appendChild(opt);
+  }
+  const casterNames = casters.map(c => c.name);
+  const desiredCaster = casterNames.includes(mc.selectedCaster) ? mc.selectedCaster : casterNames[0];
+  casterSel.value = desiredCaster;
+  mc.selectedCaster = desiredCaster;
+
+  const caster = state.party.find(p => p.name === desiredCaster);
+  const availableSpells = (caster?.spells || [])
+    .map(entry => ({ entry, spell: getSpellById(entry.id) }))
+    .filter(({ spell, entry }) => spell && spell.type === "mass_combat" && entry.status !== "exhausted")
+    .filter(({ spell }) => !(spell.oncePerBattle && mc.spellsUsed?.[caster.name]?.[spell.id]));
+
+  spellSel.innerHTML = "";
+  if (!availableSpells.length) {
+    const opt = document.createElement("option");
+    opt.textContent = "No mass combat spells";
+    opt.disabled = true;
+    spellSel.appendChild(opt);
+    spellSel.disabled = true;
+  } else {
+    spellSel.disabled = false;
+    for (const { spell } of availableSpells) {
+      const opt = document.createElement("option");
+      opt.value = spell.id;
+      opt.textContent = formatSpellOptionLabel(spell);
+      spellSel.appendChild(opt);
+    }
+    const spellIds = availableSpells.map(s => s.spell.id);
+    const desiredSpell = spellIds.includes(mc.selectedSpellId) ? mc.selectedSpellId : spellIds[0];
+    spellSel.value = desiredSpell;
+    mc.selectedSpellId = desiredSpell;
+  }
+
+  const targets = getMassSpellTargets();
+  targetSel.innerHTML = "";
+  targets.forEach(({ value, label }) => {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    targetSel.appendChild(opt);
+  });
+  const hasTargets = targets.length > 0;
+  targetSel.disabled = !hasTargets;
+  const targetValues = targets.map(t => t.value);
+  const desiredTarget = targetValues.includes(mc.selectedTarget) ? mc.selectedTarget : (targetValues[0] || "");
+  targetSel.value = desiredTarget;
+  mc.selectedTarget = desiredTarget;
+
+  const canCastNow = spellWindowOpen && caster && availableSpells.length > 0 && hasTargets;
+  castBtn.disabled = !canCastNow;
+
+  if (mc.phase !== "active") {
+    hint.textContent = "Start mass combat to cast spells.";
+  } else if (!spellWindowOpen) {
+    hint.textContent = "Mass spells can be used before resolving the Left flank.";
+  } else if (!hasTargets) {
+    hint.textContent = "No enemy units available to target.";
+  } else {
+    hint.textContent = "Cast a spell before the first clash of this round.";
+  }
+}
+
+function onMassSpellSelectionChange() {
+  state.massCombat.selectedCaster = $("massCaster")?.value || "";
+  state.massCombat.selectedSpellId = $("massSpell")?.value || "";
+  state.massCombat.selectedTarget = $("massSpellTarget")?.value || "";
+  saveSetupToStorage(state);
+  renderMassSpellControls();
+}
+
 function resetMassZonesFromDeployment() {
   const fresh = createEmptyMassZones();
   for (const zone of MASS_ZONE_ORDER) {
@@ -3487,9 +3694,11 @@ function resolveMassCombatStep() {
       const playerRoll = rollD6(1)[0];
       const enemyScore = enemyRoll + enemyUnit.strength;
       const playerScore = playerRoll + playerUnit.strength;
+      const enemyWins = enemyScore > playerScore;
+      const playerWins = playerScore > enemyScore;
       state.massCombat.latestRoll = buildLatestRoll([
-        { rolls: [enemyRoll], successMask: [true], label: `${enemyUnit.name} (Str ${enemyUnit.strength})` },
-        { rolls: [playerRoll], successMask: [true], label: `${playerUnit.name} (Str ${playerUnit.strength})` },
+        { rolls: [enemyRoll], successMask: [enemyWins], label: `${enemyUnit.name} (Str ${enemyUnit.strength})` },
+        { rolls: [playerRoll], successMask: [playerWins], label: `${playerUnit.name} (Str ${playerUnit.strength})` },
       ]);
       pushMassLog(`⚔️ ${MASS_ZONE_LABELS[zoneKey]} clash: Enemy ${enemyUnit.name} ${enemyScore} vs Your ${playerUnit.name} ${playerScore}.`);
       if (playerScore > enemyScore) {
@@ -3533,6 +3742,10 @@ function startMassCombat() {
   state.massCombat.phase = "active";
   state.massCombat.currentZone = 0;
   state.massCombat.winner = null;
+  state.massCombat.spellsUsed = {};
+  state.massCombat.selectedCaster = "";
+  state.massCombat.selectedSpellId = "";
+  state.massCombat.selectedTarget = "";
   const startStamp = state.massCombat.startedAt || nowStamp();
   state.massCombat.startedAt = null;
   state.massCombat.log = [`=== Mass combat started (${startStamp}) ===`];
@@ -3794,6 +4007,7 @@ function renderMassCombat() {
   const resolveBtn = $("resolveMassStep");
   if (resolveBtn) resolveBtn.disabled = !canResolve;
 
+  renderMassSpellControls();
   renderMassBattlefield();
   renderMassLog();
   renderMassLatestRoll();
@@ -4729,6 +4943,11 @@ function initUI() {
   massBattlefield?.addEventListener("input", (e) => {
     const enemyInput = e.target.closest("[data-mass-field]");
     if (enemyInput) onMassEnemyFieldChange(enemyInput);
+  });
+  $("massCastSpell")?.addEventListener("click", castMassSpell);
+  ["massCaster", "massSpell", "massSpellTarget"].forEach(id => {
+    $(id)?.addEventListener("change", onMassSpellSelectionChange);
+    $(id)?.addEventListener("input", onMassSpellSelectionChange);
   });
   $("clearMassLog")?.addEventListener("click", clearMassLog);
   $("copyMassLog")?.addEventListener("click", copyMassLog);

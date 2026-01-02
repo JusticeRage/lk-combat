@@ -822,6 +822,32 @@ Successes Required: 4"></textarea>
               <button class="btn btn-outline-primary btn-sm" id="resolveMassStep" type="button">Resolve next clash</button>
             </div>
 
+            <div class="card border-info-subtle mt-3">
+              <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+                  <div>
+                    <div class="fw-semibold">Mass combat spell</div>
+                    <div class="text-body-secondary small" id="massSpellHint">Cast before the Left flank clash.</div>
+                  </div>
+                  <button class="btn btn-outline-primary btn-sm" type="button" id="massCastSpell">Cast spell</button>
+                </div>
+                <div class="row g-2 mt-2">
+                  <div class="col-12 col-md-4">
+                    <label class="form-label" for="massCaster">Caster</label>
+                    <select class="form-select" id="massCaster"></select>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label class="form-label" for="massSpell">Spell</label>
+                    <select class="form-select" id="massSpell"></select>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label class="form-label" for="massSpellTarget">Target</label>
+                    <select class="form-select" id="massSpellTarget"></select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="row g-3 mt-1">
               <div class="col-12 col-xl-8">
                 <div id="massBattlefield"></div>
