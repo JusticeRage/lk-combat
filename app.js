@@ -46,6 +46,9 @@ let silverAdjustMode = "add";
 
 const LS_KEY = "lk_combat_tracker_v3";
 const DEFAULT_CODES_PER_BOOK = 100;
+const MAP_ZOOM_DEFAULT = 100;
+const MAP_ZOOM_MIN = 50;
+const MAP_ZOOM_MAX = 200;
 
 const CODE_BOOKS = [
   { key: "A", title: "The Valley of Bones", length: DEFAULT_CODES_PER_BOOK },
@@ -55,6 +58,10 @@ const CODE_BOOKS = [
   { key: "E", title: "The Savage Lands", length: DEFAULT_CODES_PER_BOOK },
   { key: "F", title: "Drakehallow", length: DEFAULT_CODES_PER_BOOK },
 ];
+
+const MAP_IMAGES = {
+  A: { src: "./img/1_valley_of_bones.png", alt: "The Valley of Bones map" },
+};
 
 const GARRISON_OPTIONS = [
   { value: "", label: "— None —" },
@@ -398,6 +405,18 @@ function normalizeBookKey(key) {
   return exists ? key : (CODE_BOOKS[0]?.key || "A");
 }
 
+function getMapEntry(key) {
+  const bookKey = normalizeBookKey(key);
+  const book = CODE_BOOKS.find(b => b.key === bookKey);
+  const map = MAP_IMAGES[bookKey] || null;
+  return {
+    key: bookKey,
+    title: book?.title || `Book ${bookKey}`,
+    src: map?.src || "",
+    alt: map?.alt || (book ? `${book.title} map` : "Map"),
+  };
+}
+
 function matchItem(text) {
   if (!text) return { ...EMPTY_EQUIPMENT_ENTRY };
   const byId = getItemById(text);
@@ -659,6 +678,8 @@ function normalizeVaultItems(list) {
 function saveSetupToStorage(state) {
   state.codes = normalizeCodes(state.codes);
   state.selectedCodeBook = normalizeBookKey(state.selectedCodeBook);
+  state.selectedMapBook = normalizeBookKey(state.selectedMapBook);
+  state.mapZoom = clampInt(state.mapZoom, MAP_ZOOM_MIN, MAP_ZOOM_MAX, MAP_ZOOM_DEFAULT);
   state.vault = normalizeVaultItems(state.vault);
   state.missionNotes = typeof state.missionNotes === "string" ? state.missionNotes : "";
   state.armies = normalizeArmies(state.armies);
@@ -701,6 +722,8 @@ function saveSetupToStorage(state) {
     })),
     codes: state.codes,
     selectedCodeBook: state.selectedCodeBook,
+    selectedMapBook: state.selectedMapBook,
+    mapZoom: state.mapZoom,
     skillCheck: {
       name: state.skillCheck.name,
       type: state.skillCheck.type,
@@ -724,6 +747,8 @@ function loadSetupFromStorage(state) {
 
     state.codes = normalizeCodes(obj.codes);
     state.selectedCodeBook = normalizeBookKey(obj.selectedCodeBook);
+    state.selectedMapBook = normalizeBookKey(obj.selectedMapBook);
+    state.mapZoom = clampInt(obj.mapZoom, MAP_ZOOM_MIN, MAP_ZOOM_MAX, MAP_ZOOM_DEFAULT);
 
     state.silverCoins = clampInt(obj.silverCoins, 0, 999999, 0);
     state.vault = normalizeVaultItems(obj.vault);
@@ -971,6 +996,8 @@ const state = {
   selectedPartyIndex: 0,
   codes: createEmptyCodes(),
   selectedCodeBook: CODE_BOOKS[0]?.key || "A",
+  selectedMapBook: CODE_BOOKS[0]?.key || "A",
+  mapZoom: MAP_ZOOM_DEFAULT,
   latestRoll: { groups: [], totalSuccesses: 0 },
   skillCheck: normalizeSkillCheck(DEFAULT_SKILL_CHECK),
 };
@@ -2475,6 +2502,53 @@ function renderCodes() {
   gridArea.querySelectorAll("input[data-code-index]").forEach(input => input.addEventListener("change", onCodeToggle));
 }
 
+function renderMaps() {
+  const tabArea = $("mapBookTabs");
+  const viewer = $("mapViewer");
+  const zoomInput = $("mapZoom");
+  const zoomLabel = $("mapZoomLabel");
+  if (!tabArea || !viewer || !zoomInput || !zoomLabel) return;
+
+  state.selectedMapBook = normalizeBookKey(state.selectedMapBook);
+  state.mapZoom = clampInt(state.mapZoom, MAP_ZOOM_MIN, MAP_ZOOM_MAX, MAP_ZOOM_DEFAULT);
+
+  zoomInput.min = String(MAP_ZOOM_MIN);
+  zoomInput.max = String(MAP_ZOOM_MAX);
+  zoomInput.value = state.mapZoom;
+  zoomLabel.textContent = `${state.mapZoom}%`;
+
+  const activeKey = state.selectedMapBook;
+  tabArea.innerHTML = CODE_BOOKS.map(book => `
+    <button type="button" class="lk-code-tab${book.key === activeKey ? " is-active" : ""}" data-map-book="${book.key}" aria-pressed="${book.key === activeKey ? "true" : "false"}">
+      <p class="lk-code-tab__title mb-0">${escapeHtml(`${book.title} (${book.key})`)}</p>
+    </button>
+  `).join("");
+
+  tabArea.querySelectorAll("[data-map-book]").forEach(btn => btn.addEventListener("click", () => {
+    state.selectedMapBook = normalizeBookKey(btn.getAttribute("data-map-book"));
+    saveSetupToStorage(state);
+    renderMaps();
+  }));
+
+  const map = getMapEntry(activeKey);
+  if (map.src) {
+    viewer.innerHTML = `
+      <div class="lk-map-viewer">
+        <div class="lk-map-canvas" role="region" aria-label="${escapeHtml(map.title)} map">
+          <img src="${map.src}" alt="${escapeHtml(map.alt)}" class="lk-map-image" style="width:${state.mapZoom}%">
+        </div>
+        <div class="text-body-secondary small">Use the zoom slider and scrollbars to explore the map.</div>
+      </div>
+    `;
+  } else {
+    viewer.innerHTML = `
+      <div class="lk-map-viewer text-body-secondary">
+        <p class="mb-0">No map is available for ${escapeHtml(map.title)} yet.</p>
+      </div>
+    `;
+  }
+}
+
 function onCodeToggle(e) {
   const book = e.target.getAttribute("data-code-book");
   const idx = Number(e.target.getAttribute("data-code-index"));
@@ -2634,6 +2708,7 @@ function renderAll() {
   renderArmies();
   renderFleets();
   renderCodes();
+  renderMaps();
   renderSkillCheck();
   renderLatestRoll();
   renderSkillRoll();
@@ -2972,6 +3047,40 @@ function initUI() {
       document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === target));
     });
   });
+
+  const tabHotkeys = {
+    p: "partyTabBtn",
+    f: "battleTabBtn",
+    s: "skillTabBtn",
+    a: "armiesTabBtn",
+    c: "codesTabBtn",
+    m: "mapTabBtn",
+  };
+
+  document.addEventListener("keydown", (e) => {
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+    const tag = (e.target?.tagName || "").toUpperCase();
+    if (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || e.target?.isContentEditable) return;
+
+    const key = (e.key || "").toLowerCase();
+    const btnId = tabHotkeys[key];
+    if (!btnId) return;
+
+    const btn = $(btnId);
+    if (!btn) return;
+    const tab = bootstrap.Tab.getOrCreateInstance(btn);
+    tab.show();
+    btn.focus();
+  });
+
+  const mapZoom = $("mapZoom");
+  if (mapZoom) {
+    mapZoom.addEventListener("input", (e) => {
+      state.mapZoom = clampInt(e.target.value, MAP_ZOOM_MIN, MAP_ZOOM_MAX, state.mapZoom);
+      saveSetupToStorage(state);
+      renderMaps();
+    });
+  }
   $("playerAttacker").addEventListener("change", updatePlayerActionControls);
   $("playerAttack").addEventListener("click", () => {
     partyAttack(Number($("playerAttacker").value), Number($("playerTarget").value));
@@ -3309,6 +3418,8 @@ function initState() {
   const loaded = loadSetupFromStorage(state);
   state.codes = normalizeCodes(state.codes);
   state.selectedCodeBook = normalizeBookKey(state.selectedCodeBook);
+  state.selectedMapBook = normalizeBookKey(state.selectedMapBook);
+  state.mapZoom = clampInt(state.mapZoom, MAP_ZOOM_MIN, MAP_ZOOM_MAX, MAP_ZOOM_DEFAULT);
   state.skillCheck = normalizeSkillCheck(state.skillCheck);
   state.armies = normalizeArmies(state.armies);
   if (!loaded) {
@@ -3319,6 +3430,8 @@ function initState() {
     state.silverCoins = 0;
     state.codes = createEmptyCodes();
     state.selectedCodeBook = CODE_BOOKS[0]?.key || "A";
+    state.selectedMapBook = CODE_BOOKS[0]?.key || "A";
+    state.mapZoom = MAP_ZOOM_DEFAULT;
     state.skillCheck = normalizeSkillCheck(DEFAULT_SKILL_CHECK);
     state.armies = [];
     saveSetupToStorage(state);
