@@ -98,11 +98,26 @@ const SKILL_OPTIONS = [
   { key: "charisma", label: STAT_LABELS.charisma },
 ];
 
+const createDefaultSeaCombat = () => ({
+  phase: "setup", // setup | active | ended
+  selectedFleetIndex: 0,
+  player: { name: "", fighting: 0, health: 0, maxHealth: 0 },
+  enemy: { name: "Enemy ship", fighting: 4, health: 8, maxHealth: 8 },
+  turn: "player",
+  allowSpell: true,
+  log: [],
+  latestRoll: { groups: [], totalSuccesses: 0 },
+  selectedCaster: "",
+  selectedSpellId: "",
+  spellsUsed: {},
+});
+
 const APP_HOTKEYS = [
   { key: "p", label: "Switch to Party tab", handler: () => showTabById("partyTabBtn") },
   { key: "f", label: "Switch to Battle tab", handler: () => showTabById("battleTabBtn") },
   { key: "s", label: "Switch to Skill checks tab", handler: () => showTabById("skillTabBtn") },
   { key: "a", label: "Switch to Armies tab", handler: () => showTabById("armiesTabBtn") },
+  { key: "v", label: "Switch to Fleet tab", handler: () => showTabById("fleetTabBtn") },
   { key: "c", label: "Switch to Codes tab", handler: () => showTabById("codesTabBtn") },
   { key: "m", label: "Switch to Maps tab", handler: () => showTabById("mapTabBtn") },
   { key: "d", label: "Open the dice roller", handler: openDiceRollDialog },
@@ -223,6 +238,45 @@ function normalizeFleet(raw) {
 function normalizeFleets(list) {
   if (!Array.isArray(list)) return [];
   return list.map(normalizeFleet);
+}
+
+function normalizeSeaCombat(raw) {
+  const base = createDefaultSeaCombat();
+  if (!raw || typeof raw !== "object") return base;
+
+  const normalized = {
+    ...base,
+    phase: ["setup", "active", "ended"].includes(raw.phase) ? raw.phase : base.phase,
+    selectedFleetIndex: clampInt(raw.selectedFleetIndex, 0, Math.max(0, (state?.fleets?.length || 0) - 1), 0),
+    allowSpell: !!raw.allowSpell,
+    turn: raw.turn === "enemy" ? "enemy" : "player",
+    selectedCaster: typeof raw.selectedCaster === "string" ? raw.selectedCaster : base.selectedCaster,
+    selectedSpellId: typeof raw.selectedSpellId === "string" ? raw.selectedSpellId : base.selectedSpellId,
+    spellsUsed: (raw.spellsUsed && typeof raw.spellsUsed === "object") ? raw.spellsUsed : base.spellsUsed,
+  };
+
+  const playerMax = clampInt(raw.player?.maxHealth, 0, 999, base.player.maxHealth);
+  normalized.player = {
+    name: typeof raw.player?.name === "string" ? raw.player.name : base.player.name,
+    fighting: clampInt(raw.player?.fighting, 0, 999, base.player.fighting),
+    maxHealth: playerMax,
+    health: clampInt(raw.player?.health, 0, playerMax || 0, base.player.health),
+  };
+
+  const enemyMax = clampInt(raw.enemy?.maxHealth ?? raw.enemy?.health, 1, 999, base.enemy.maxHealth);
+  normalized.enemy = {
+    name: typeof raw.enemy?.name === "string" ? raw.enemy.name : base.enemy.name,
+    fighting: clampInt(raw.enemy?.fighting, 0, 999, base.enemy.fighting),
+    maxHealth: enemyMax,
+    health: clampInt(raw.enemy?.health, 0, enemyMax, enemyMax),
+  };
+
+  normalized.log = Array.isArray(raw.log)
+    ? raw.log.map(String).slice(-200)
+    : base.log;
+  normalized.latestRoll = buildLatestRoll(raw.latestRoll?.groups || []);
+
+  return normalized;
 }
 
 function bsModalShow(id) {
@@ -702,6 +756,7 @@ function saveSetupToStorage(state) {
   state.missionNotes = typeof state.missionNotes === "string" ? state.missionNotes : "";
   state.armies = normalizeArmies(state.armies);
   state.fleets = normalizeFleets(state.fleets);
+  state.seaCombat = normalizeSeaCombat(state.seaCombat);
   const payload = {
     silverCoins: state.silverCoins || 0,
     vault: state.vault,
@@ -752,6 +807,10 @@ function saveSetupToStorage(state) {
       latestRoll: state.skillCheck.latestRoll,
       lastResult: state.skillCheck.lastResult,
     },
+    seaCombat: {
+      ...state.seaCombat,
+      log: state.seaCombat.log?.slice(-200) || [],
+    },
   };
   try { localStorage.setItem(LS_KEY, JSON.stringify(payload)); } catch {}
 }
@@ -773,6 +832,7 @@ function loadSetupFromStorage(state) {
     state.missionNotes = typeof obj.missionNotes === "string" ? obj.missionNotes : "";
     state.armies = normalizeArmies(obj.armies);
     state.fleets = normalizeFleets(obj.fleets);
+    state.seaCombat = normalizeSeaCombat(obj.seaCombat);
 
     if (Array.isArray(obj.party)) {
       const seen = new Set();
@@ -1019,6 +1079,7 @@ const state = {
   latestRoll: { groups: [], totalSuccesses: 0 },
   skillCheck: normalizeSkillCheck(DEFAULT_SKILL_CHECK),
   diceRoller: { count: 1, latestRolls: [] },
+  seaCombat: createDefaultSeaCombat(),
 };
 
 function buildLatestRoll(groups) {
@@ -2508,6 +2569,423 @@ function removeFleetAt(idx) {
   renderFleets();
 }
 
+function pushSeaLog(line) {
+  state.seaCombat.log = (state.seaCombat.log || []).concat([line]).slice(-200);
+  renderSeaLog();
+}
+
+function renderSeaLog() {
+  const el = $("seaLog");
+  if (!el) return;
+  el.textContent = (state.seaCombat.log || []).join("\n");
+  el.scrollTop = el.scrollHeight;
+}
+
+function recordSeaLatestRoll(entry) {
+  state.seaCombat.latestRoll = buildLatestRoll([entry]);
+}
+
+function recordSeaLatestRollGroups(groups) {
+  state.seaCombat.latestRoll = buildLatestRoll(groups);
+}
+
+function renderSeaLatestRoll() {
+  renderRollDisplay({
+    wrapId: "seaLatestRoll",
+    titleId: "seaLatestRollTitle",
+    roll: state.seaCombat?.latestRoll,
+    emptyTitle: "Latest roll",
+    emptyText: "Roll to see the dice.",
+  });
+}
+
+function getSelectedFleet() {
+  if (!Array.isArray(state.fleets) || !state.fleets.length) return null;
+  const idx = clampInt(state.seaCombat.selectedFleetIndex, 0, state.fleets.length - 1, 0);
+  state.seaCombat.selectedFleetIndex = idx;
+  return state.fleets[idx] || null;
+}
+
+function resetSeaCombatState() {
+  const current = normalizeSeaCombat(state.seaCombat);
+  state.seaCombat = normalizeSeaCombat({
+    ...createDefaultSeaCombat(),
+    enemy: current.enemy,
+    selectedFleetIndex: current.selectedFleetIndex,
+  });
+  saveSetupToStorage(state);
+  renderSeaCombat();
+}
+
+function startSeaCombat() {
+  state.seaCombat = normalizeSeaCombat(state.seaCombat);
+  const fleet = getSelectedFleet();
+  if (!fleet) {
+    pushSeaLog("(!) Add a fleet to start sea combat.");
+    return;
+  }
+
+  const playerHealth = clampInt(fleet.health, 0, 999, 0);
+  const playerFighting = clampInt(fleet.fighting, 0, 999, 0);
+  const enemyHealth = clampInt(state.seaCombat.enemy?.maxHealth, 1, 999, 8);
+  const enemyFighting = clampInt(state.seaCombat.enemy?.fighting, 0, 999, 0);
+  const enemyName = state.seaCombat.enemy?.name || "Enemy ship";
+
+  state.seaCombat.phase = "active";
+  state.seaCombat.turn = "player";
+  state.seaCombat.allowSpell = true;
+  state.seaCombat.log = [`=== Sea combat started (${nowStamp()}) ===`];
+  state.seaCombat.latestRoll = { groups: [], totalSuccesses: 0 };
+  state.seaCombat.spellsUsed = {};
+  state.seaCombat.player = {
+    name: fleet.name || "Your ship",
+    fighting: playerFighting,
+    health: playerHealth,
+    maxHealth: playerHealth,
+  };
+  state.seaCombat.enemy = {
+    name: enemyName,
+    fighting: enemyFighting,
+    health: enemyHealth,
+    maxHealth: enemyHealth,
+  };
+
+  pushSeaLog(`Your ship (${state.seaCombat.player.name}) engages ${enemyName}.`);
+  saveSetupToStorage(state);
+  renderSeaCombat();
+}
+
+function endSeaCombat(result) {
+  if (state.seaCombat.phase === "ended") return;
+  state.seaCombat.phase = "ended";
+  const ending = result === "victory" ? "=== Victory at sea ===" : "=== Defeat at sea ===";
+  pushSeaLog(ending);
+  saveSetupToStorage(state);
+  renderSeaCombat();
+}
+
+function canCastSeaSpell(caster, spell) {
+  const sc = state.seaCombat;
+  if (sc.phase !== "active" || sc.turn !== "player") return { ok: false, reason: "Not your turn." };
+  if (!sc.allowSpell) return { ok: false, reason: "Spell already cast before this attack." };
+  if (!caster || caster.dead || caster.health <= 0) return { ok: false, reason: "Caster unavailable." };
+  const known = findKnownSpell(caster, spell.id);
+  if (!known) return { ok: false, reason: "Spell is not prepared." };
+  if (known.status === "exhausted") return { ok: false, reason: "Spell is exhausted." };
+  if (spell.type !== "sea_combat") return { ok: false, reason: "This spell cannot be used at sea." };
+  const alreadyUsed = sc.spellsUsed?.[caster.name]?.[spell.id];
+  if (spell.oncePerBattle && alreadyUsed) return { ok: false, reason: "Spell already used this sea battle." };
+  return { ok: true, reason: "" };
+}
+
+function castSeaSpell() {
+  const casterName = $("seaCaster")?.value;
+  const spellId = $("seaSpell")?.value;
+  if (!casterName || !spellId) return;
+
+  const caster = state.party.find(p => p.name === casterName);
+  const spell = getSpellById(spellId);
+  if (!caster || !spell) return;
+
+  const chk = canCastSeaSpell(caster, spell);
+  if (!chk.ok) {
+    pushSeaLog(`(!) Cannot cast ${spell.name}: ${chk.reason}`);
+    return;
+  }
+
+  pushSeaLog(`[Spell] ${caster.name} casts ${spell.name}`);
+
+  for (const step of spell.steps || []) {
+    if (step.type === "attackFixed") {
+      const times = clampInt(step.times, 1, 99, 1);
+      const groups = [];
+      for (let i = 0; i < times; i++) {
+        const { rolls, hits } = computeAttackHits(step.fighting || 0, 4);
+        groups.push({ rolls, target: 4, label: `Attack ${i + 1}` });
+        if (hits > 0) {
+          state.seaCombat.enemy.health = Math.max(0, state.seaCombat.enemy.health - hits);
+          pushSeaLog(`        Attack ${i + 1}: hits=${hits} (Enemy HP ${state.seaCombat.enemy.health}/${state.seaCombat.enemy.maxHealth})`);
+        } else {
+          pushSeaLog(`        Attack ${i + 1}: no damage.`);
+        }
+      }
+      recordSeaLatestRollGroups(groups);
+    }
+
+    if (step.type === "damageFixed") {
+      state.seaCombat.enemy.health = Math.max(0, state.seaCombat.enemy.health - (step.amount || 0));
+      pushSeaLog(`        ${state.seaCombat.enemy.name} loses ${step.amount || 0} Health (HP ${state.seaCombat.enemy.health}/${state.seaCombat.enemy.maxHealth})`);
+    }
+
+    if (step.type === "healFixed") {
+      const before = state.seaCombat.player.health;
+      state.seaCombat.player.health = Math.min(state.seaCombat.player.maxHealth, state.seaCombat.player.health + (step.amount || 0));
+      const healed = state.seaCombat.player.health - before;
+      pushSeaLog(`        Your ship recovers ${healed} Health (HP ${state.seaCombat.player.health}/${state.seaCombat.player.maxHealth})`);
+    }
+  }
+
+  if (!state.seaCombat.spellsUsed[caster.name]) state.seaCombat.spellsUsed[caster.name] = {};
+  state.seaCombat.spellsUsed[caster.name][spell.id] = true;
+  state.seaCombat.allowSpell = false;
+  const known = findKnownSpell(caster, spell.id);
+  if (known) known.status = "exhausted";
+
+  if (state.seaCombat.enemy.health <= 0) {
+    pushSeaLog(`${state.seaCombat.enemy.name} sinks!`);
+    endSeaCombat("victory");
+    return;
+  }
+
+  saveSetupToStorage(state);
+  renderSeaCombat();
+}
+
+function seaPlayerAttack() {
+  state.seaCombat = normalizeSeaCombat(state.seaCombat);
+  if (state.seaCombat.phase !== "active" || state.seaCombat.turn !== "player") return;
+  if (state.seaCombat.player.health <= 0 || state.seaCombat.enemy.health <= 0) return;
+
+  const { rolls, hits } = computeAttackHits(state.seaCombat.player.fighting, 4);
+  recordSeaLatestRoll({ rolls, target: 4, label: "Player attack" });
+  pushSeaLog(`⚓ Player attack: Fighting ${state.seaCombat.player.fighting} vs 4+ | rolls=${fmtDice(rolls)} => hits=${hits}`);
+  if (hits > 0) {
+    state.seaCombat.enemy.health = Math.max(0, state.seaCombat.enemy.health - hits);
+    pushSeaLog(`   ${state.seaCombat.enemy.name} loses ${hits} Health (HP ${state.seaCombat.enemy.health}/${state.seaCombat.enemy.maxHealth})`);
+  } else {
+    pushSeaLog("   No damage dealt.");
+  }
+
+  state.seaCombat.allowSpell = false;
+
+  if (state.seaCombat.enemy.health <= 0) {
+    pushSeaLog(`${state.seaCombat.enemy.name} sinks!`);
+    endSeaCombat("victory");
+    return;
+  }
+
+  state.seaCombat.turn = "enemy";
+  saveSetupToStorage(state);
+  renderSeaCombat();
+}
+
+function seaEnemyAttack() {
+  state.seaCombat = normalizeSeaCombat(state.seaCombat);
+  if (state.seaCombat.phase !== "active" || state.seaCombat.turn !== "enemy") return;
+  if (state.seaCombat.player.health <= 0 || state.seaCombat.enemy.health <= 0) return;
+
+  const { rolls, hits } = computeAttackHits(state.seaCombat.enemy.fighting, 4);
+  recordSeaLatestRoll({ rolls, target: 4, label: "Enemy attack" });
+  pushSeaLog(`☠️ Enemy attack: Fighting ${state.seaCombat.enemy.fighting} vs 4+ | rolls=${fmtDice(rolls)} => hits=${hits}`);
+  if (hits > 0) {
+    state.seaCombat.player.health = Math.max(0, state.seaCombat.player.health - hits);
+    pushSeaLog(`   Your ship loses ${hits} Health (HP ${state.seaCombat.player.health}/${state.seaCombat.player.maxHealth})`);
+  } else {
+    pushSeaLog("   No damage taken.");
+  }
+
+  if (state.seaCombat.player.health <= 0) {
+    pushSeaLog("Your ship is destroyed!");
+    endSeaCombat("defeat");
+    return;
+  }
+
+  state.seaCombat.turn = "player";
+  state.seaCombat.allowSpell = true;
+  saveSetupToStorage(state);
+  renderSeaCombat();
+}
+
+function renderSeaSpellControls() {
+  const casterSel = $("seaCaster");
+  const spellSel = $("seaSpell");
+  const hint = $("seaSpellHint");
+  if (!casterSel || !spellSel || !hint) return;
+
+  const casters = state.party.filter(p => isSpellcaster(p.name) && !p.dead && p.health > 0);
+  casterSel.innerHTML = "";
+  if (!casters.length) {
+    const opt = document.createElement("option");
+    opt.textContent = "No spellcasters";
+    opt.disabled = true;
+    casterSel.appendChild(opt);
+    casterSel.disabled = true;
+    spellSel.innerHTML = "";
+    spellSel.disabled = true;
+    hint.textContent = "Add a spellcaster to use sea spells.";
+    return;
+  }
+
+  casterSel.disabled = false;
+  for (const c of casters) {
+    const opt = document.createElement("option");
+    opt.value = c.name;
+    opt.textContent = c.name;
+    casterSel.appendChild(opt);
+  }
+  const casterNames = casters.map(c => c.name);
+  const desiredCaster = casterNames.includes(state.seaCombat.selectedCaster)
+    ? state.seaCombat.selectedCaster
+    : casterNames[0];
+  casterSel.value = desiredCaster;
+  state.seaCombat.selectedCaster = desiredCaster;
+
+  const caster = state.party.find(p => p.name === desiredCaster);
+  const availableSpells = (caster?.spells || [])
+    .map(entry => ({ entry, spell: getSpellById(entry.id) }))
+    .filter(({ spell, entry }) => spell && spell.type === "sea_combat" && entry.status !== "exhausted");
+
+  spellSel.innerHTML = "";
+  if (!availableSpells.length) {
+    const opt = document.createElement("option");
+    opt.textContent = "No sea combat spells";
+    opt.disabled = true;
+    spellSel.appendChild(opt);
+    spellSel.disabled = true;
+    hint.textContent = "Prepare a Sea Combat spell.";
+  } else {
+    spellSel.disabled = false;
+    for (const { spell } of availableSpells) {
+      const opt = document.createElement("option");
+      opt.value = spell.id;
+      opt.textContent = formatSpellOptionLabel(spell);
+      spellSel.appendChild(opt);
+    }
+    const spellIds = availableSpells.map(s => s.spell.id);
+    const desiredSpell = spellIds.includes(state.seaCombat.selectedSpellId)
+      ? state.seaCombat.selectedSpellId
+      : spellIds[0];
+    spellSel.value = desiredSpell;
+    state.seaCombat.selectedSpellId = desiredSpell;
+    hint.textContent = state.seaCombat.allowSpell && state.seaCombat.turn === "player"
+      ? "Cast one spell before each of your attacks."
+      : "Wait for your next attack to cast a spell.";
+  }
+}
+
+function renderSeaShipStatus(targetId, ship) {
+  const el = $(targetId);
+  if (!el) return;
+  if (!ship || !ship.maxHealth) {
+    el.innerHTML = `<div class="text-body-secondary small">No ship selected.</div>`;
+    return;
+  }
+  const max = Math.max(1, ship.maxHealth);
+  const hp = Math.max(0, ship.health);
+  const pct = Math.min(100, Math.max(0, (hp / max) * 100));
+  const hpClass = getHpBarClass(pct);
+  el.innerHTML = `
+    <div class="d-flex align-items-center justify-content-between gap-2">
+      <div>
+        <div class="fw-semibold">${escapeHtml(ship.name || "Unnamed ship")}</div>
+        <div class="text-body-secondary small">Fighting ${ship.fighting || 0} • Defence 4+</div>
+      </div>
+      <span class="badge text-bg-secondary">${hp}/${max} HP</span>
+    </div>
+    <div class="progress mt-2" role="progressbar" aria-valuenow="${hp}" aria-valuemin="0" aria-valuemax="${max}">
+      <div class="progress-bar${hpClass ? ` ${hpClass}` : ""}" style="width:${pct}%"></div>
+    </div>
+  `;
+}
+
+function renderSeaCombat() {
+  const playerShipSelect = $("seaPlayerShip");
+  const enemyNameInput = $("seaEnemyName");
+  const enemyFightingInput = $("seaEnemyFighting");
+  const enemyHealthInput = $("seaEnemyHealth");
+  const phasePill = $("seaPhasePill");
+  const turnPill = $("seaTurnPill");
+  const turnHint = $("seaTurnHint");
+  if (!playerShipSelect || !enemyNameInput || !enemyFightingInput || !enemyHealthInput || !phasePill || !turnPill || !turnHint) return;
+
+  state.seaCombat = normalizeSeaCombat(state.seaCombat);
+  const sc = state.seaCombat;
+
+  playerShipSelect.innerHTML = "";
+  if (!state.fleets.length) {
+    const opt = document.createElement("option");
+    opt.textContent = "Add a fleet first";
+    opt.disabled = true;
+    playerShipSelect.appendChild(opt);
+    playerShipSelect.disabled = true;
+  } else {
+    playerShipSelect.disabled = false;
+    state.fleets.forEach((fleet, idx) => {
+      const opt = document.createElement("option");
+      opt.value = String(idx);
+      opt.textContent = fleet.name ? `${fleet.name} — Fighting ${fleet.fighting}` : `Fleet ${idx + 1} — Fighting ${fleet.fighting}`;
+      playerShipSelect.appendChild(opt);
+    });
+    const clampedIdx = clampInt(sc.selectedFleetIndex, 0, state.fleets.length - 1, 0);
+    sc.selectedFleetIndex = clampedIdx;
+    playerShipSelect.value = String(clampedIdx);
+  }
+
+  enemyNameInput.value = sc.enemy.name;
+  enemyFightingInput.value = sc.enemy.fighting;
+  enemyHealthInput.value = sc.enemy.maxHealth;
+
+  phasePill.textContent = `Phase: ${sc.phase === "active" ? "Combat" : (sc.phase === "ended" ? "Ended" : "Setup")}`;
+  turnPill.textContent = sc.phase === "active"
+    ? `Turn: ${sc.turn === "player" ? "Your ship" : "Enemy"}`
+    : "Turn: —";
+
+  const canStart = state.fleets.length > 0 && sc.enemy.maxHealth > 0;
+  const playerCanAct = sc.phase === "active" && sc.turn === "player" && sc.player.health > 0 && sc.enemy.health > 0;
+  const enemyCanAct = sc.phase === "active" && sc.turn === "enemy" && sc.player.health > 0 && sc.enemy.health > 0;
+
+  const startBtn = $("startSeaCombat");
+  const resetBtn = $("resetSeaCombat");
+  const playerAttackBtn = $("seaPlayerAttack");
+  const enemyAttackBtn = $("seaEnemyAttack");
+  const spellBtn = $("seaCastSpell");
+  if (startBtn) startBtn.disabled = !canStart;
+  if (resetBtn) resetBtn.disabled = false;
+  if (playerAttackBtn) playerAttackBtn.disabled = !playerCanAct;
+  if (enemyAttackBtn) enemyAttackBtn.disabled = !enemyCanAct;
+  if (spellBtn) spellBtn.disabled = !(playerCanAct && sc.allowSpell);
+
+  turnHint.textContent = sc.phase === "active"
+    ? (sc.turn === "player" ? "Cast a sea spell (optional) then attack." : "Let the enemy strike back.")
+    : "Start sea combat to begin.";
+
+  renderSeaShipStatus("seaPlayerStatus", sc.player && sc.phase !== "setup" ? sc.player : getSelectedFleet());
+  renderSeaShipStatus("seaEnemyStatus", sc.enemy);
+  renderSeaSpellControls();
+  const spellHasOptions = !($("seaSpell")?.disabled) && !!$("seaSpell")?.value;
+  if (spellBtn) spellBtn.disabled = spellBtn.disabled || !(playerCanAct && sc.allowSpell && spellHasOptions);
+  renderSeaLatestRoll();
+  renderSeaLog();
+}
+
+function onSeaEnemyFieldChange() {
+  state.seaCombat.enemy.name = $("seaEnemyName")?.value || "Enemy ship";
+  state.seaCombat.enemy.fighting = clampInt($("seaEnemyFighting")?.value, 0, 999, state.seaCombat.enemy.fighting);
+  const maxHp = clampInt($("seaEnemyHealth")?.value, 1, 999, state.seaCombat.enemy.maxHealth);
+  state.seaCombat.enemy.maxHealth = maxHp;
+  if (state.seaCombat.phase !== "active") {
+    state.seaCombat.enemy.health = maxHp;
+  }
+  saveSetupToStorage(state);
+  renderSeaCombat();
+}
+
+function onSeaShipSelectChange() {
+  const idx = clampInt($("seaPlayerShip")?.value, 0, state.fleets.length - 1, 0);
+  state.seaCombat.selectedFleetIndex = idx;
+  saveSetupToStorage(state);
+  renderSeaCombat();
+}
+
+function onSeaSpellSelectionChange() {
+  const casterSel = $("seaCaster");
+  const spellSel = $("seaSpell");
+  if (!casterSel || !spellSel) return;
+  state.seaCombat.selectedCaster = casterSel.value;
+  state.seaCombat.selectedSpellId = spellSel.value;
+  saveSetupToStorage(state);
+}
+
 function renderCodes() {
   const tabArea = $("codeBookTabs");
   const gridArea = $("codeGrid");
@@ -2758,6 +3236,7 @@ function renderAll() {
   renderControls();
   renderArmies();
   renderFleets();
+  renderSeaCombat();
   renderCodes();
   renderMaps();
   renderSkillCheck();
@@ -3331,6 +3810,22 @@ function initUI() {
     });
   }
 
+  // Sea combat
+  $("startSeaCombat")?.addEventListener("click", startSeaCombat);
+  $("resetSeaCombat")?.addEventListener("click", resetSeaCombatState);
+  $("seaPlayerAttack")?.addEventListener("click", seaPlayerAttack);
+  $("seaEnemyAttack")?.addEventListener("click", seaEnemyAttack);
+  $("seaCastSpell")?.addEventListener("click", castSeaSpell);
+  $("seaPlayerShip")?.addEventListener("change", onSeaShipSelectChange);
+  ["seaEnemyName", "seaEnemyFighting", "seaEnemyHealth"].forEach(id => $(id)?.addEventListener("input", onSeaEnemyFieldChange));
+  $("seaCaster")?.addEventListener("change", onSeaSpellSelectionChange);
+  $("seaSpell")?.addEventListener("change", onSeaSpellSelectionChange);
+  $("clearSeaLog")?.addEventListener("click", () => { state.seaCombat.log = []; saveSetupToStorage(state); renderSeaLog(); });
+  $("copySeaLog")?.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText((state.seaCombat.log || []).join("\n")); pushSeaLog("(sea log copied to clipboard)"); }
+    catch { pushSeaLog("(!) Could not copy sea log (clipboard permission blocked)."); }
+  });
+
   $("addMember").addEventListener("click", openHeroDialog);
 
   $("addMob").addEventListener("click", () => {
@@ -3501,6 +3996,7 @@ function initState() {
   state.mapZoom = clampInt(state.mapZoom, MAP_ZOOM_MIN, MAP_ZOOM_MAX, MAP_ZOOM_DEFAULT);
   state.skillCheck = normalizeSkillCheck(state.skillCheck);
   state.armies = normalizeArmies(state.armies);
+  state.seaCombat = normalizeSeaCombat(state.seaCombat);
   if (!loaded) {
     const randomHero = HERO_NAMES[Math.floor(Math.random() * HERO_NAMES.length)];
     state.party = [ newMember(randomHero) ];
@@ -3513,6 +4009,7 @@ function initState() {
     state.mapZoom = MAP_ZOOM_DEFAULT;
     state.skillCheck = normalizeSkillCheck(DEFAULT_SKILL_CHECK);
     state.armies = [];
+    state.seaCombat = createDefaultSeaCombat();
     saveSetupToStorage(state);
   }
 }

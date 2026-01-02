@@ -386,7 +386,13 @@ Successes Required: 4"></textarea>
       <li class="nav-item" role="presentation">
         <button class="nav-link" id="armiesTabBtn" data-bs-toggle="tab" data-bs-target="#armiesTab"
                 type="button" role="tab" aria-controls="armiesTab" aria-selected="false">
-          Armies &amp; Fleet
+          Armies
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="fleetTabBtn" data-bs-toggle="tab" data-bs-target="#fleetTab"
+                type="button" role="tab" aria-controls="fleetTab" aria-selected="false">
+          Fleet
         </button>
       </li>
       <li class="nav-item" role="presentation">
@@ -676,7 +682,7 @@ Successes Required: 4"></textarea>
         </div>
       </section>
 
-      <!-- Armies & Fleet -->
+      <!-- Armies -->
       <section id="armiesTab" class="tab-pane fade" role="tabpanel" aria-labelledby="armiesTabBtn" tabindex="0">
         <div class="card shadow-sm">
           <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
@@ -693,8 +699,11 @@ Successes Required: 4"></textarea>
             <div id="armyList" class="lk-army-list"></div>
           </div>
         </div>
+      </section>
 
-        <div class="card shadow-sm mt-3">
+      <!-- Fleet -->
+      <section id="fleetTab" class="tab-pane fade" role="tabpanel" aria-labelledby="fleetTabBtn" tabindex="0">
+        <div class="card shadow-sm">
           <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
             <div>
               <h2 class="h5 mb-0">Fleets</h2>
@@ -707,6 +716,120 @@ Successes Required: 4"></textarea>
           </div>
           <div class="card-body">
             <div id="fleetList" class="lk-army-list"></div>
+          </div>
+        </div>
+
+        <div class="card shadow-sm mt-3">
+          <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <div>
+              <h2 class="h5 mb-0">Sea combat</h2>
+              <div class="text-body-secondary small">Ships clash at Fighting versus Defence 4+.</div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap justify-content-end">
+              <button class="btn btn-outline-secondary btn-sm" id="resetSeaCombat" type="button">Reset</button>
+              <button class="btn btn-success btn-sm" id="startSeaCombat" type="button">Start / Restart</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-12 col-xl-8">
+                <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                  <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <span class="lk-pill" id="seaPhasePill">Phase: —</span>
+                    <span class="lk-pill" id="seaTurnPill">Turn: —</span>
+                  </div>
+                  <div id="seaTurnHint" class="text-body-secondary small text-end"></div>
+                </div>
+
+                <div class="card mt-3 lk-inner-card">
+                  <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                      <div class="col-md-4">
+                        <label class="form-label mb-1" for="seaPlayerShip">Your ship</label>
+                        <select id="seaPlayerShip" class="form-select form-select-sm"></select>
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label mb-1" for="seaEnemyName">Enemy ship</label>
+                        <input type="text" id="seaEnemyName" class="form-control form-control-sm" placeholder="Enemy ship">
+                      </div>
+                      <div class="col-md-2">
+                        <label class="form-label mb-1" for="seaEnemyFighting">Enemy Fighting</label>
+                        <input type="number" min="0" max="999" id="seaEnemyFighting" class="form-control form-control-sm">
+                      </div>
+                      <div class="col-md-2">
+                        <label class="form-label mb-1" for="seaEnemyHealth">Enemy Health</label>
+                        <input type="number" min="1" max="999" id="seaEnemyHealth" class="form-control form-control-sm">
+                      </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mt-3">
+                      <div class="text-body-secondary small">Your ship makes the first attack. Defence is always 4+.</div>
+                      <div class="d-flex flex-wrap gap-2 justify-content-end">
+                        <button class="btn btn-outline-primary btn-sm" id="seaCastSpell" type="button">Cast sea spell</button>
+                        <button class="btn btn-primary btn-sm" id="seaPlayerAttack" type="button">Player attack</button>
+                        <button class="btn btn-outline-danger btn-sm" id="seaEnemyAttack" type="button">Enemy attack</button>
+                      </div>
+                    </div>
+
+                    <div class="row g-3 mt-2">
+                      <div class="col-md-6">
+                        <div class="card lk-inner-card h-100">
+                          <div class="card-header py-2">
+                            <h3 class="h6 mb-0">Your ship</h3>
+                          </div>
+                          <div class="card-body" id="seaPlayerStatus"></div>
+                        </div>
+                      </div>
+                      <div class="col-md-6">
+                        <div class="card lk-inner-card h-100">
+                          <div class="card-header py-2">
+                            <h3 class="h6 mb-0">Enemy ship</h3>
+                          </div>
+                          <div class="card-body" id="seaEnemyStatus"></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="row g-3 align-items-end mt-1">
+                      <div class="col-md-4">
+                        <label class="form-label mb-1" for="seaCaster">Spellcaster</label>
+                        <select id="seaCaster" class="form-select form-select-sm"></select>
+                      </div>
+                      <div class="col-md-5">
+                        <label class="form-label mb-1" for="seaSpell">Sea combat spell</label>
+                        <select id="seaSpell" class="form-select form-select-sm"></select>
+                      </div>
+                      <div class="col-md-3 text-md-end">
+                        <div class="text-body-secondary small" id="seaSpellHint"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12 col-xl-4">
+                <div class="card shadow-sm mb-3">
+                  <div class="card-header d-flex align-items-center justify-content-between gap-2">
+                    <h2 class="h6 mb-0" id="seaLatestRollTitle">Latest roll</h2>
+                  </div>
+                  <div class="card-body">
+                    <div id="seaLatestRoll" class="lk-latest-roll"></div>
+                  </div>
+                </div>
+                <div class="card shadow-sm">
+                  <div class="card-header d-flex align-items-center justify-content-between gap-2">
+                    <h2 class="h6 mb-0">Log</h2>
+                    <div class="d-flex gap-2">
+                      <button class="btn btn-outline-secondary btn-sm" id="copySeaLog" type="button">Copy</button>
+                      <button class="btn btn-link btn-sm" id="clearSeaLog" type="button">Clear</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div id="seaLog" class="lk-log"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
