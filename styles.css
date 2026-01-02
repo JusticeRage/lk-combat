@@ -240,6 +240,8 @@
   overflow: auto;
   min-height: 320px;
   max-height: 70vh;
+  touch-action: none;
+  cursor: grab;
 }
 
 .lk-map-image {

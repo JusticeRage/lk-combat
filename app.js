@@ -2553,6 +2553,99 @@ function renderCodes() {
   gridArea.querySelectorAll("input[data-code-index]").forEach(input => input.addEventListener("change", onCodeToggle));
 }
 
+function applyMapZoom(nextZoom, { mapImage = null, zoomInput = null, zoomLabel = null, rerenderFallback = true } = {}) {
+  const imgEl = mapImage || document.querySelector(".lk-map-image");
+  const inputEl = zoomInput || $("mapZoom");
+  const labelEl = zoomLabel || $("mapZoomLabel");
+  const clamped = clampInt(nextZoom, MAP_ZOOM_MIN, MAP_ZOOM_MAX, state.mapZoom);
+
+  if (clamped === state.mapZoom && imgEl && inputEl && labelEl) return clamped;
+
+  state.mapZoom = clamped;
+  saveSetupToStorage(state);
+
+  if (inputEl) inputEl.value = clamped;
+  if (labelEl) labelEl.textContent = `${clamped}%`;
+  if (imgEl) {
+    imgEl.style.width = `${clamped}%`;
+  } else if (rerenderFallback) {
+    renderMaps();
+  }
+
+  return clamped;
+}
+
+function setupMapGestures(canvas, mapImage, zoomInput, zoomLabel) {
+  if (!canvas || !mapImage) return;
+
+  const pointers = new Map();
+  let lastPos = null;
+  let initialPinchDistance = null;
+  let initialZoom = state.mapZoom;
+
+  const updateZoom = (value) => applyMapZoom(Math.round(value), { mapImage, zoomInput, zoomLabel, rerenderFallback: false });
+
+  const onPointerDown = (e) => {
+    canvas.setPointerCapture?.(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    lastPos = { x: e.clientX, y: e.clientY };
+
+    if (pointers.size === 2) {
+      const [a, b] = Array.from(pointers.values());
+      initialPinchDistance = Math.hypot(a.x - b.x, a.y - b.y);
+      initialZoom = state.mapZoom;
+    }
+  };
+
+  const onPointerMove = (e) => {
+    if (!pointers.has(e.pointerId)) return;
+
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.size === 2 && initialPinchDistance) {
+      const [a, b] = Array.from(pointers.values());
+      const distance = Math.hypot(a.x - b.x, a.y - b.y);
+      if (distance > 0) {
+        const scale = distance / initialPinchDistance;
+        updateZoom(initialZoom * scale);
+      }
+      return;
+    }
+
+    if (pointers.size === 1 && lastPos) {
+      const deltaX = e.clientX - lastPos.x;
+      const deltaY = e.clientY - lastPos.y;
+      canvas.scrollLeft -= deltaX;
+      canvas.scrollTop -= deltaY;
+      lastPos = { x: e.clientX, y: e.clientY };
+    }
+  };
+
+  const onPointerUp = (e) => {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) {
+      initialPinchDistance = null;
+      initialZoom = state.mapZoom;
+    }
+    if (pointers.size === 0) {
+      lastPos = null;
+    }
+    try { canvas.releasePointerCapture?.(e.pointerId); } catch (err) {}
+  };
+
+  const onWheel = (e) => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    const step = e.deltaY < 0 ? 5 : -5;
+    updateZoom(state.mapZoom + step);
+  };
+
+  canvas.addEventListener("pointerdown", onPointerDown);
+  canvas.addEventListener("pointermove", onPointerMove);
+  ["pointerup", "pointercancel", "pointerleave"].forEach(evt => canvas.addEventListener(evt, onPointerUp));
+  canvas.addEventListener("wheel", onWheel, { passive: false });
+}
+
 function renderMaps() {
   const tabArea = $("mapBookTabs");
   const viewer = $("mapViewer");
@@ -2588,9 +2681,13 @@ function renderMaps() {
         <div class="lk-map-canvas" role="region" aria-label="${escapeHtml(map.title)} map">
           <img src="${map.src}" alt="${escapeHtml(map.alt)}" class="lk-map-image" style="width:${state.mapZoom}%">
         </div>
-        <div class="text-body-secondary small">Use the zoom slider and scrollbars to explore the map.</div>
       </div>
     `;
+
+    const mapCanvas = viewer.querySelector(".lk-map-canvas");
+    const mapImage = viewer.querySelector(".lk-map-image");
+    applyMapZoom(state.mapZoom, { mapImage, zoomInput, zoomLabel, rerenderFallback: false });
+    setupMapGestures(mapCanvas, mapImage, zoomInput, zoomLabel);
   } else {
     viewer.innerHTML = `
       <div class="lk-map-viewer text-body-secondary">
@@ -3155,9 +3252,7 @@ function initUI() {
   const mapZoom = $("mapZoom");
   if (mapZoom) {
     mapZoom.addEventListener("input", (e) => {
-      state.mapZoom = clampInt(e.target.value, MAP_ZOOM_MIN, MAP_ZOOM_MAX, state.mapZoom);
-      saveSetupToStorage(state);
-      renderMaps();
+      applyMapZoom(e.target.value);
     });
   }
   $("playerAttacker").addEventListener("change", updatePlayerActionControls);
