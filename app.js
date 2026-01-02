@@ -110,6 +110,7 @@ const createDefaultSeaCombat = () => ({
   selectedCaster: "",
   selectedSpellId: "",
   spellsUsed: {},
+  encounters: [],
 });
 
 const APP_HOTKEYS = [
@@ -217,7 +218,7 @@ function normalizeArmies(list) {
 }
 
 function normalizeFleet(raw) {
-  const base = { name: "", fighting: 0, health: 0, cargo: 0, garrison: "", cargoContents: [] };
+  const base = { name: "", fighting: 0, health: 0, maxHealth: 0, cargo: 0, garrison: "", cargoContents: [] };
   if (!raw || typeof raw !== "object") return base;
 
   const cargo = clampInt(raw.cargo, 0, 99, base.cargo);
@@ -225,10 +226,14 @@ function normalizeFleet(raw) {
   while (cargoContents.length < cargo) cargoContents.push("");
   if (cargoContents.length > cargo) cargoContents = cargoContents.slice(0, cargo);
 
+  const maxHealth = clampInt(raw.maxHealth ?? raw.health, 0, 999, base.maxHealth);
+  const health = clampInt(raw.health ?? maxHealth, 0, maxHealth || 999, base.health);
+
   return {
     name: typeof raw.name === "string" ? raw.name.trim() : base.name,
     fighting: clampInt(raw.fighting, 0, 999, base.fighting),
-    health: clampInt(raw.health, 0, 999, base.health),
+    health,
+    maxHealth,
     cargo,
     cargoContents,
     garrison: normalizeGarrison(raw.garrison),
@@ -240,6 +245,19 @@ function normalizeFleets(list) {
   return list.map(normalizeFleet);
 }
 
+function normalizeSeaShip(raw) {
+  const base = { name: "", fighting: 0, health: 0, maxHealth: 0 };
+  if (!raw || typeof raw !== "object") return base;
+  const maxHealth = clampInt(raw.maxHealth ?? raw.health, 0, 999, base.maxHealth);
+  const health = clampInt(raw.health ?? maxHealth, 0, maxHealth || 999, base.health);
+  return {
+    name: typeof raw.name === "string" ? raw.name.trim() : base.name,
+    fighting: clampInt(raw.fighting, 0, 999, base.fighting),
+    health,
+    maxHealth,
+  };
+}
+
 function normalizeSeaCombat(raw) {
   const base = createDefaultSeaCombat();
   if (!raw || typeof raw !== "object") return base;
@@ -248,33 +266,27 @@ function normalizeSeaCombat(raw) {
     ...base,
     phase: ["setup", "active", "ended"].includes(raw.phase) ? raw.phase : base.phase,
     selectedFleetIndex: clampInt(raw.selectedFleetIndex, 0, Math.max(0, (state?.fleets?.length || 0) - 1), 0),
-    allowSpell: !!raw.allowSpell,
-    turn: raw.turn === "enemy" ? "enemy" : "player",
+    allowSpell: typeof raw.allowSpell === "boolean" ? raw.allowSpell : base.allowSpell,
+    turn: raw.turn === "enemy" ? "enemy" : base.turn,
     selectedCaster: typeof raw.selectedCaster === "string" ? raw.selectedCaster : base.selectedCaster,
     selectedSpellId: typeof raw.selectedSpellId === "string" ? raw.selectedSpellId : base.selectedSpellId,
     spellsUsed: (raw.spellsUsed && typeof raw.spellsUsed === "object") ? raw.spellsUsed : base.spellsUsed,
-  };
-
-  const playerMax = clampInt(raw.player?.maxHealth, 0, 999, base.player.maxHealth);
-  normalized.player = {
-    name: typeof raw.player?.name === "string" ? raw.player.name : base.player.name,
-    fighting: clampInt(raw.player?.fighting, 0, 999, base.player.fighting),
-    maxHealth: playerMax,
-    health: clampInt(raw.player?.health, 0, playerMax || 0, base.player.health),
-  };
-
-  const enemyMax = clampInt(raw.enemy?.maxHealth ?? raw.enemy?.health, 1, 999, base.enemy.maxHealth);
-  normalized.enemy = {
-    name: typeof raw.enemy?.name === "string" ? raw.enemy.name : base.enemy.name,
-    fighting: clampInt(raw.enemy?.fighting, 0, 999, base.enemy.fighting),
-    maxHealth: enemyMax,
-    health: clampInt(raw.enemy?.health, 0, enemyMax, enemyMax),
+    encounters: Array.isArray(raw.encounters) ? raw.encounters.map(normalizeSeaShip) : base.encounters,
   };
 
   normalized.log = Array.isArray(raw.log)
     ? raw.log.map(String).slice(-200)
     : base.log;
   normalized.latestRoll = buildLatestRoll(raw.latestRoll?.groups || []);
+
+  const player = normalizeSeaShip(raw.player);
+  const enemy = normalizeSeaShip(raw.enemy);
+  normalized.player = player;
+  normalized.enemy = {
+    ...enemy,
+    maxHealth: enemy.maxHealth || base.enemy.maxHealth,
+    health: clampInt(enemy.health || enemy.maxHealth || base.enemy.maxHealth, 0, enemy.maxHealth || base.enemy.maxHealth, enemy.maxHealth || base.enemy.maxHealth),
+  };
 
   return normalized;
 }
@@ -690,6 +702,10 @@ function renderHpBlock(entity) {
   `;
 }
 
+function renderHp(current, max) {
+  return renderHpBlock({ health: current, maxHealth: max });
+}
+
 function renderPortraitHp(hero) {
   const current = Math.max(0, hero?.health ?? 0);
   const max = Math.max(1, hero?.maxHealth ?? 1);
@@ -1029,6 +1045,7 @@ function parseFleetsImport(text) {
 
     const fightingLine = lines.find(l => /^fighting\b/i.test(l));
     const healthLine = lines.find(l => /^health\b/i.test(l));
+    const currentHealthLine = lines.find(l => /^current\s*health\b/i.test(l));
     const cargoLine = lines.find(l => /^cargo\b/i.test(l));
     const garrisonLine = lines.find(l => /^garrison\b/i.test(l));
 
@@ -1037,10 +1054,13 @@ function parseFleetsImport(text) {
     }
 
     const fighting = Number(fightingLine.match(/fighting\s*:?\s*(\d+)/i)?.[1]);
-    const health = Number(healthLine.match(/health\s*:?\s*(\d+)/i)?.[1]);
+    const maxHealth = Number(healthLine.match(/health\s*:?\s*(\d+)/i)?.[1]);
+    const health = currentHealthLine
+      ? Number(currentHealthLine.match(/current\s*health\s*:?\s*(\d+)/i)?.[1])
+      : maxHealth;
     const cargo = Number(cargoLine.match(/cargo\s*:?\s*(\d+)/i)?.[1]);
 
-    if (Number.isNaN(fighting) || Number.isNaN(health) || Number.isNaN(cargo)) {
+    if (Number.isNaN(fighting) || Number.isNaN(health) || Number.isNaN(cargo) || Number.isNaN(maxHealth)) {
       throw new Error(`Could not read stats for "${name}".`);
     }
 
@@ -1048,11 +1068,26 @@ function parseFleetsImport(text) {
       ? garrisonLine.replace(/^garrison\s*:?/i, "").trim()
       : "";
 
-    return normalizeFleet({ name, fighting, health, cargo, garrison });
+    return normalizeFleet({ name, fighting, health, maxHealth, cargo, garrison });
   });
 
   if (!fleets.length) throw new Error("No fleets found.");
   return fleets;
+}
+
+function parseSeaEncountersImport(text) {
+  const lines = text.replace(/\r/g, "").split("\n").map(l => l.trim()).filter(Boolean);
+  if (!lines.length) throw new Error("No encounter lines found.");
+
+  const regex = /^(.*?)\s*[–-]\s*Fighting\s*(\d+)\s*[;,]?\s*Health\s*(\d+)/i;
+  const encounters = lines.map((line, idx) => {
+    const match = line.match(regex);
+    if (!match) throw new Error(`Line ${idx + 1} could not be read. Expected "Name – Fighting X Health Y".`);
+    const [, name, fighting, health] = match;
+    return normalizeSeaShip({ name, fighting: Number(fighting), health: Number(health), maxHealth: Number(health) });
+  });
+
+  return encounters;
 }
 
 // --- State ---
@@ -2431,67 +2466,153 @@ function renderFleets() {
   }
 
   const rows = state.fleets.map((fleet, idx) => {
-    const options = [...GARRISON_OPTIONS];
-    const hasCustomGarrison = fleet.garrison && !options.some(opt => opt.value === fleet.garrison);
-    if (hasCustomGarrison) options.push({ value: fleet.garrison, label: fleet.garrison });
-    const garrisonOptions = options.map(opt => `
-      <option value="${escapeHtml(opt.value)}"${opt.value === fleet.garrison ? " selected" : ""}>${escapeHtml(opt.label)}</option>
-    `).join("");
-    const idBase = `fleet-${idx}`;
-
+    const garrisonLabel = fleet.garrison ? escapeHtml(fleet.garrison) : "Harbour unset";
+    const shipName = escapeHtml(fleet.name || `Fleet ${idx + 1}`);
+    const maxHp = Math.max(1, fleet.maxHealth || fleet.health || 1);
+    const hpBar = renderHp(fleet.health, maxHp);
     const cargoSlots = (fleet.cargoContents || []).map((good, cargoIdx) => {
-      const cargoOptions = [`<option value="">— Empty —</option>`,
-        ...FLEET_GOODS.map(entry => `<option value="${escapeHtml(entry)}"${entry === good ? " selected" : ""}>${escapeHtml(entry)}</option>`)
-      ].join("");
-      return `
-        <div class="col-sm-6 col-lg-4">
-          <label class="form-label" for="${idBase}-cargo-${cargoIdx}">Cargo ${cargoIdx + 1}</label>
-          <select class="form-select" id="${idBase}-cargo-${cargoIdx}" data-fleet-index="${idx}" data-fleet-cargo-index="${cargoIdx}">${cargoOptions}</select>
-        </div>
-      `;
-    }).join("");
+      const label = good ? escapeHtml(good) : `Empty ${cargoIdx + 1}`;
+      return `<span class="badge text-bg-secondary lk-badge">${label}</span>`;
+    }).join(" ");
+    const cargoText = fleet.cargo > 0
+      ? (cargoSlots || `<span class="text-body-secondary small">${fleet.cargo} empty cargo slot${fleet.cargo === 1 ? "" : "s"}.</span>`)
+      : `<span class="text-body-secondary small">No cargo space.</span>`;
 
-    const cargoManifest = fleet.cargo > 0 ? `
-      <div class="mt-2">
-        <div class="row g-2">${cargoSlots}</div>
+    const stats = [
+      { label: "⚔️ Fighting", value: fleet.fighting || 0 },
+      { label: "🩸 Current HP", value: `${fleet.health}/${maxHp}` },
+      { label: "📦 Cargo", value: `${fleet.cargo} slot${fleet.cargo === 1 ? "" : "s"}` },
+      { label: "🗺️ Harbour", value: garrisonLabel },
+    ];
+    const statGrid = `
+      <div class="lk-stat-grid">
+        ${stats.map(stat => `
+          <div class="lk-stat-label">${stat.label}</div>
+          <div class="lk-stat-value">${stat.value}</div>
+        `).join("")}
       </div>
-    ` : "";
+    `;
 
     return `
       <div class="lk-army-row${idx < state.fleets.length - 1 ? " mb-2" : ""}">
-        <div class="row g-2 align-items-end">
-          <div class="col-12 col-md-3">
-            <label class="form-label" for="${idBase}-name">Ship name</label>
-            <input type="text" class="form-control" id="${idBase}-name" data-fleet-field="name" data-fleet-index="${idx}" value="${escapeHtml(fleet.name)}" placeholder="Ship name">
+        <div class="d-flex flex-column gap-3">
+          <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+            <div>
+              <div class="fw-semibold">${shipName}</div>
+              <div class="text-body-secondary small">${garrisonLabel}</div>
+            </div>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm lk-icon-btn" data-fleet-edit="${idx}" aria-label="Edit fleet">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="btn btn-outline-danger btn-sm lk-icon-btn" data-fleet-remove="${idx}" aria-label="Remove fleet">
+                <i class="bi bi-trash" aria-hidden="true"></i>
+              </button>
+            </div>
           </div>
-          <div class="col-6 col-md-2">
-            <label class="form-label" for="${idBase}-fighting">⚔️ Fighting</label>
-            <input type="number" min="0" max="999" class="form-control" id="${idBase}-fighting" data-fleet-field="fighting" data-fleet-index="${idx}" value="${fleet.fighting}">
-          </div>
-          <div class="col-6 col-md-2">
-            <label class="form-label" for="${idBase}-health">❤️ Health</label>
-            <input type="number" min="0" max="999" class="form-control" id="${idBase}-health" data-fleet-field="health" data-fleet-index="${idx}" value="${fleet.health}">
-          </div>
-          <div class="col-6 col-md-2">
-            <label class="form-label" for="${idBase}-cargo">📦 Cargo units</label>
-            <input type="number" min="0" max="99" class="form-control" id="${idBase}-cargo" data-fleet-field="cargo" data-fleet-index="${idx}" value="${fleet.cargo}">
-          </div>
-          <div class="col-12 col-md-2">
-            <label class="form-label" for="${idBase}-garrison">🗺️ Harbour</label>
-            <select class="form-select" id="${idBase}-garrison" data-fleet-field="garrison" data-fleet-index="${idx}">${garrisonOptions}</select>
-          </div>
-          <div class="col-12 col-md-1 d-flex justify-content-md-end align-items-end">
-            <button type="button" class="btn btn-outline-danger btn-sm lk-icon-btn" data-fleet-remove="${idx}" aria-label="Remove fleet">
-              <i class="bi bi-trash" aria-hidden="true"></i>
-            </button>
+          <div class="row g-3 align-items-center">
+            <div class="col-12 col-lg-4">${hpBar}</div>
+            <div class="col-12 col-lg-8 d-flex flex-column gap-2">
+              ${statGrid}
+              <div class="d-flex flex-wrap gap-2 align-items-center">
+                <div class="lk-stat-label mb-0">Cargo manifest</div>
+                <div class="d-flex flex-wrap gap-2">${cargoText}</div>
+              </div>
+            </div>
           </div>
         </div>
-        ${cargoManifest}
       </div>
     `;
   });
 
   list.innerHTML = rows.join("");
+}
+
+let fleetEditIndex = null;
+
+function renderFleetEditCargoInputs(desiredCount, defaults = []) {
+  const wrap = $("fleetEditCargoSlots");
+  if (!wrap) return;
+  const existing = [...wrap.querySelectorAll("[data-fleet-edit-cargo-slot]")].map(sel => sel.value);
+  const count = clampInt(desiredCount, 0, 99, 0);
+  const values = Array.from({ length: count }, (_, idx) => normalizeCargoGood(defaults[idx] ?? existing[idx] ?? ""));
+  wrap.innerHTML = values.map((val, idx) => {
+    const options = [`<option value="">— Empty —</option>`,
+      ...FLEET_GOODS.map(entry => `<option value="${escapeHtml(entry)}"${entry === val ? " selected" : ""}>${escapeHtml(entry)}</option>`),
+    ].join("");
+    return `
+      <div class="col-sm-6 col-lg-4">
+        <label class="form-label" for="fleet-edit-cargo-${idx}">Cargo ${idx + 1}</label>
+        <select class="form-select" id="fleet-edit-cargo-${idx}" data-fleet-edit-cargo-slot="${idx}">${options}</select>
+      </div>
+    `;
+  }).join("");
+}
+
+function openFleetEditDialog(idx) {
+  const fleet = state.fleets[idx];
+  if (!fleet) return;
+  fleetEditIndex = idx;
+  const options = [...GARRISON_OPTIONS];
+  const hasCustomGarrison = fleet.garrison && !options.some(opt => opt.value === fleet.garrison);
+  if (hasCustomGarrison) options.push({ value: fleet.garrison, label: fleet.garrison });
+  $("fleetEditGarrison").innerHTML = options.map(opt => `
+    <option value="${escapeHtml(opt.value)}"${opt.value === fleet.garrison ? " selected" : ""}>${escapeHtml(opt.label)}</option>
+  `).join("");
+
+  $("fleetEditName").value = fleet.name;
+  $("fleetEditFighting").value = fleet.fighting;
+  $("fleetEditMaxHealth").value = fleet.maxHealth || fleet.health || 1;
+  $("fleetEditHealth").value = fleet.health;
+  $("fleetEditCargo").value = fleet.cargo;
+  renderFleetEditCargoInputs(fleet.cargo, fleet.cargoContents);
+
+  $("fleetEditError").style.display = "none";
+  $("fleetEditError").textContent = "";
+  bsModalShow("fleetEditDialog");
+}
+
+function readFleetEditCargoValues(desiredCount) {
+  const wrap = $("fleetEditCargoSlots");
+  if (!wrap) return [];
+  const selects = [...wrap.querySelectorAll("[data-fleet-edit-cargo-slot]")];
+  const count = clampInt(desiredCount, 0, 99, selects.length);
+  return Array.from({ length: count }, (_, idx) => normalizeCargoGood(selects[idx]?.value || ""));
+}
+
+function saveFleetEditDialog() {
+  if (fleetEditIndex == null) return;
+  const fleet = state.fleets[fleetEditIndex];
+  if (!fleet) return;
+
+  try {
+    const name = $("fleetEditName").value || "";
+    const fighting = clampInt($("fleetEditFighting").value, 0, 999, fleet.fighting);
+    const maxHealth = clampInt($("fleetEditMaxHealth").value, 1, 999, fleet.maxHealth || 1);
+    const health = clampInt($("fleetEditHealth").value, 0, maxHealth, fleet.health);
+    const cargo = clampInt($("fleetEditCargo").value, 0, 99, fleet.cargo);
+    const cargoContents = readFleetEditCargoValues(cargo);
+    const garrison = normalizeGarrison($("fleetEditGarrison").value);
+
+    state.fleets[fleetEditIndex] = normalizeFleet({
+      ...fleet,
+      name,
+      fighting,
+      health,
+      maxHealth,
+      cargo,
+      cargoContents,
+      garrison,
+    });
+
+    saveSetupToStorage(state);
+    renderFleets();
+    renderSeaCombat();
+    bsModalHide("fleetEditDialog");
+  } catch (e) {
+    $("fleetEditError").style.display = "";
+    $("fleetEditError").textContent = String(e?.message || e);
+  }
 }
 
 function onArmyFieldChange(target) {
@@ -2581,6 +2702,16 @@ function renderSeaLog() {
   el.scrollTop = el.scrollHeight;
 }
 
+function persistSeaPlayerHealth() {
+  const fleet = getSelectedFleet();
+  if (!fleet || !state.seaCombat?.player) return;
+  fleet.maxHealth = state.seaCombat.player.maxHealth || fleet.maxHealth;
+  const maxHp = Math.max(1, fleet.maxHealth || state.seaCombat.player.maxHealth || 1);
+  fleet.health = clampInt(state.seaCombat.player.health, 0, maxHp, fleet.health);
+  saveSetupToStorage(state);
+  renderFleets();
+}
+
 function recordSeaLatestRoll(entry) {
   state.seaCombat.latestRoll = buildLatestRoll([entry]);
 }
@@ -2612,6 +2743,7 @@ function resetSeaCombatState() {
     ...createDefaultSeaCombat(),
     enemy: current.enemy,
     selectedFleetIndex: current.selectedFleetIndex,
+    encounters: current.encounters,
   });
   saveSetupToStorage(state);
   renderSeaCombat();
@@ -2625,7 +2757,8 @@ function startSeaCombat() {
     return;
   }
 
-  const playerHealth = clampInt(fleet.health, 0, 999, 0);
+  const playerMaxHealth = clampInt(fleet.maxHealth || fleet.health, 1, 999, 1);
+  const playerHealth = clampInt(fleet.health, 0, playerMaxHealth, playerMaxHealth);
   const playerFighting = clampInt(fleet.fighting, 0, 999, 0);
   const enemyHealth = clampInt(state.seaCombat.enemy?.maxHealth, 1, 999, 8);
   const enemyFighting = clampInt(state.seaCombat.enemy?.fighting, 0, 999, 0);
@@ -2641,7 +2774,7 @@ function startSeaCombat() {
     name: fleet.name || "Your ship",
     fighting: playerFighting,
     health: playerHealth,
-    maxHealth: playerHealth,
+    maxHealth: playerMaxHealth,
   };
   state.seaCombat.enemy = {
     name: enemyName,
@@ -2650,6 +2783,7 @@ function startSeaCombat() {
     maxHealth: enemyHealth,
   };
 
+  persistSeaPlayerHealth();
   pushSeaLog(`Your ship (${state.seaCombat.player.name}) engages ${enemyName}.`);
   saveSetupToStorage(state);
   renderSeaCombat();
@@ -2660,6 +2794,7 @@ function endSeaCombat(result) {
   state.seaCombat.phase = "ended";
   const ending = result === "victory" ? "=== Victory at sea ===" : "=== Defeat at sea ===";
   pushSeaLog(ending);
+  persistSeaPlayerHealth();
   saveSetupToStorage(state);
   renderSeaCombat();
 }
@@ -2722,6 +2857,7 @@ function castSeaSpell() {
       state.seaCombat.player.health = Math.min(state.seaCombat.player.maxHealth, state.seaCombat.player.health + (step.amount || 0));
       const healed = state.seaCombat.player.health - before;
       pushSeaLog(`        Your ship recovers ${healed} Health (HP ${state.seaCombat.player.health}/${state.seaCombat.player.maxHealth})`);
+      persistSeaPlayerHealth();
     }
   }
 
@@ -2784,6 +2920,7 @@ function seaEnemyAttack() {
     pushSeaLog("   No damage taken.");
   }
 
+  persistSeaPlayerHealth();
   if (state.seaCombat.player.health <= 0) {
     pushSeaLog("Your ship is destroyed!");
     endSeaCombat("defeat");
@@ -2866,26 +3003,70 @@ function renderSeaSpellControls() {
 function renderSeaShipStatus(targetId, ship) {
   const el = $(targetId);
   if (!el) return;
-  if (!ship || !ship.maxHealth) {
+  if (!ship) {
     el.innerHTML = `<div class="text-body-secondary small">No ship selected.</div>`;
     return;
   }
-  const max = Math.max(1, ship.maxHealth);
-  const hp = Math.max(0, ship.health);
-  const pct = Math.min(100, Math.max(0, (hp / max) * 100));
-  const hpClass = getHpBarClass(pct);
+  const max = Math.max(1, ship.maxHealth || ship.health || 1);
+  const hp = clampInt(ship.health, 0, max, 0);
+  const hpBar = renderHp(hp, max);
+  const statGrid = `
+    <div class="lk-stat-grid mt-2">
+      <div class="lk-stat-label">⚔️ Fighting</div>
+      <div class="lk-stat-value">${ship.fighting || 0}</div>
+      <div class="lk-stat-label">🛡️ Defence</div>
+      <div class="lk-stat-value">4+</div>
+    </div>
+  `;
   el.innerHTML = `
-    <div class="d-flex align-items-center justify-content-between gap-2">
+    <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
       <div>
         <div class="fw-semibold">${escapeHtml(ship.name || "Unnamed ship")}</div>
         <div class="text-body-secondary small">Fighting ${ship.fighting || 0} • Defence 4+</div>
       </div>
       <span class="badge text-bg-secondary">${hp}/${max} HP</span>
     </div>
-    <div class="progress mt-2" role="progressbar" aria-valuenow="${hp}" aria-valuemin="0" aria-valuemax="${max}">
-      <div class="progress-bar${hpClass ? ` ${hpClass}` : ""}" style="width:${pct}%"></div>
-    </div>
+    <div class="mt-2">${hpBar}</div>
+    ${statGrid}
   `;
+}
+
+function renderSeaEncounterList() {
+  const wrap = $("seaEncounterList");
+  if (!wrap) return;
+  const encounters = state.seaCombat.encounters || [];
+  if (!encounters.length) {
+    wrap.innerHTML = `<div class="text-body-secondary small">Import encounters to quickly load common enemies.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = encounters.map((enc, idx) => {
+    const maxHp = Math.max(1, enc.maxHealth || enc.health || 1);
+    const hp = clampInt(enc.health, 0, maxHp, maxHp);
+    return `
+      <div class="d-flex align-items-center justify-content-between gap-2 p-2 border rounded">
+        <div>
+          <div class="fw-semibold">${escapeHtml(enc.name || `Enemy ${idx + 1}`)}</div>
+          <div class="text-body-secondary small">Fighting ${enc.fighting || 0} • Health ${hp}/${maxHp}</div>
+        </div>
+        <button class="btn btn-outline-primary btn-sm" type="button" data-sea-encounter-use="${idx}">Use</button>
+      </div>
+    `;
+  }).join("");
+}
+
+function applySeaEncounter(idx) {
+  const encounter = state.seaCombat.encounters?.[idx];
+  if (!encounter) return;
+  const normalized = normalizeSeaShip(encounter);
+  state.seaCombat.phase = "setup";
+  state.seaCombat.enemy = {
+    ...normalized,
+    health: normalized.maxHealth || normalized.health,
+    maxHealth: normalized.maxHealth || normalized.health,
+  };
+  saveSetupToStorage(state);
+  renderSeaCombat();
 }
 
 function renderSeaCombat() {
@@ -2951,6 +3132,7 @@ function renderSeaCombat() {
 
   renderSeaShipStatus("seaPlayerStatus", sc.player && sc.phase !== "setup" ? sc.player : getSelectedFleet());
   renderSeaShipStatus("seaEnemyStatus", sc.enemy);
+  renderSeaEncounterList();
   renderSeaSpellControls();
   const spellHasOptions = !($("seaSpell")?.disabled) && !!$("seaSpell")?.value;
   if (spellBtn) spellBtn.disabled = spellBtn.disabled || !(playerCanAct && sc.allowSpell && spellHasOptions);
@@ -2959,13 +3141,20 @@ function renderSeaCombat() {
 }
 
 function onSeaEnemyFieldChange() {
-  state.seaCombat.enemy.name = $("seaEnemyName")?.value || "Enemy ship";
-  state.seaCombat.enemy.fighting = clampInt($("seaEnemyFighting")?.value, 0, 999, state.seaCombat.enemy.fighting);
-  const maxHp = clampInt($("seaEnemyHealth")?.value, 1, 999, state.seaCombat.enemy.maxHealth);
-  state.seaCombat.enemy.maxHealth = maxHp;
-  if (state.seaCombat.phase !== "active") {
-    state.seaCombat.enemy.health = maxHp;
-  }
+  const normalized = normalizeSeaShip({
+    name: $("seaEnemyName")?.value || "Enemy ship",
+    fighting: $("seaEnemyFighting")?.value,
+    maxHealth: $("seaEnemyHealth")?.value,
+    health: state.seaCombat.enemy.health,
+  });
+  const maxHp = Math.max(1, normalized.maxHealth || normalized.health || 1);
+  state.seaCombat.enemy = {
+    ...normalized,
+    maxHealth: maxHp,
+    health: state.seaCombat.phase !== "active"
+      ? maxHp
+      : clampInt(normalized.health, 0, maxHp, maxHp),
+  };
   saveSetupToStorage(state);
   renderSeaCombat();
 }
@@ -3802,6 +3991,13 @@ function initUI() {
     fleetList.addEventListener("input", (e) => onFleetFieldChange(e.target));
     fleetList.addEventListener("change", (e) => onFleetFieldChange(e.target));
     fleetList.addEventListener("click", (e) => {
+      const editBtn = e.target.closest("[data-fleet-edit]");
+      if (editBtn) {
+        const idx = Number(editBtn.getAttribute("data-fleet-edit"));
+        if (!Number.isNaN(idx)) openFleetEditDialog(idx);
+        return;
+      }
+
       const btn = e.target.closest("[data-fleet-remove]");
       if (!btn) return;
 
@@ -3809,6 +4005,16 @@ function initUI() {
       if (!Number.isNaN(idx)) removeFleetAt(idx);
     });
   }
+  $("fleetEditDialog")?.addEventListener("shown.bs.modal", () => $("fleetEditName")?.focus());
+  $("fleetEditDialog")?.addEventListener("hidden.bs.modal", () => { fleetEditIndex = null; });
+  $("fleetEditCargo")?.addEventListener("input", () => {
+    const cargoInput = $("fleetEditCargo");
+    const cargoVal = clampInt(cargoInput.value, 0, 99, 0);
+    cargoInput.value = cargoVal;
+    renderFleetEditCargoInputs(cargoVal);
+  });
+  $("fleetEditSave")?.addEventListener("click", saveFleetEditDialog);
+  $("fleetEditCancel")?.addEventListener("click", () => bsModalHide("fleetEditDialog"));
 
   // Sea combat
   $("startSeaCombat")?.addEventListener("click", startSeaCombat);
@@ -3820,10 +4026,41 @@ function initUI() {
   ["seaEnemyName", "seaEnemyFighting", "seaEnemyHealth"].forEach(id => $(id)?.addEventListener("input", onSeaEnemyFieldChange));
   $("seaCaster")?.addEventListener("change", onSeaSpellSelectionChange);
   $("seaSpell")?.addEventListener("change", onSeaSpellSelectionChange);
+  $("seaSpell")?.addEventListener("input", onSeaSpellSelectionChange);
   $("clearSeaLog")?.addEventListener("click", () => { state.seaCombat.log = []; saveSetupToStorage(state); renderSeaLog(); });
   $("copySeaLog")?.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText((state.seaCombat.log || []).join("\n")); pushSeaLog("(sea log copied to clipboard)"); }
     catch { pushSeaLog("(!) Could not copy sea log (clipboard permission blocked)."); }
+  });
+  $("importSeaEncounter")?.addEventListener("click", () => {
+    $("seaEncounterImportError").style.display = "none";
+    $("seaEncounterImportError").textContent = "";
+    $("seaEncounterImportText").value = "";
+    bsModalShow("seaEncounterImportDialog");
+  });
+  $("seaEncounterImportDialog")?.addEventListener("shown.bs.modal", () => $("seaEncounterImportText")?.focus());
+  $("seaEncounterImportCancel")?.addEventListener("click", () => bsModalHide("seaEncounterImportDialog"));
+  $("seaEncounterImportOk")?.addEventListener("click", () => {
+    try {
+      const encounters = parseSeaEncountersImport($("seaEncounterImportText").value || "");
+      state.seaCombat.encounters = encounters;
+      if (encounters[0]) {
+        state.seaCombat.enemy = { ...encounters[0], health: encounters[0].maxHealth || encounters[0].health };
+        state.seaCombat.phase = "setup";
+      }
+      saveSetupToStorage(state);
+      bsModalHide("seaEncounterImportDialog");
+      renderSeaCombat();
+    } catch (e) {
+      $("seaEncounterImportError").style.display = "";
+      $("seaEncounterImportError").textContent = String(e?.message || e);
+    }
+  });
+  $("seaEncounterList")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-sea-encounter-use]");
+    if (!btn) return;
+    const idx = Number(btn.getAttribute("data-sea-encounter-use"));
+    if (!Number.isNaN(idx)) applySeaEncounter(idx);
   });
 
   $("addMember").addEventListener("click", openHeroDialog);
