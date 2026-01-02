@@ -450,10 +450,20 @@
 }
 
 .lk-spell-table .form-label { font-size: .85rem; color: var(--bs-secondary-color); }
-.lk-spell-table td:nth-child(3),
-.lk-spell-table th:nth-child(3) {
+.lk-spell-table td:first-child,
+.lk-spell-table th:first-child {
+  min-width: 190px;
+}
+
+.lk-spell-table td:nth-child(2),
+.lk-spell-table th:nth-child(2) {
   width: 120px;
   white-space: nowrap;
+}
+
+.lk-spell-table td:nth-child(3) {
+  white-space: normal;
+  word-break: break-word;
 }
 .spell-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .5rem; align-items: center; }
 
