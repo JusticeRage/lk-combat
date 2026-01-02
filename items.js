@@ -24,12 +24,14 @@ export const ITEMS = [
   { id: "iron_shortsword", name: "Iron Shortsword", modifiers: { fighting: 1 }, hands: 1, type: "weapon" },
   { id: "steel_longsword", name: "Steel Longsword", modifiers: { fighting: 2 }, hands: 1, type: "weapon" },
   { id: "steel_scimitar", name: "Steel Scimitar", modifiers: { fighting: 2 }, hands: 1, type: "weapon" },
+  { id: "masterwork_blade", name: "Masterwork Blade", modifiers: { fighting: 3 }, hands: 1, type: "weapon" },
   { id: "skallos_runeblade", name: "Skallos Runeblade", modifiers: { fighting: 3, lore: 2 }, hands: 1, type: "weapon" },
 
   // Two-handed weapons
   { id: "maul", name: "Maul", modifiers: { fighting: 1 }, hands: 2, type: "weapon" },
   { id: "iron_greataxe", name: "Iron Greataxe", modifiers: { fighting: 2 }, hands: 2, type: "weapon" },
   { id: "steel_greatsword", name: "Steel Greatsword", modifiers: { fighting: 3 }, hands: 2, type: "weapon" },
+  { id: "masterwork_greatsword", name: "Masterwork Greatsword", modifiers: { fighting: 4 }, hands: 2, type: "weapon" },
 
   // Armours
   { id: "hide_armour", name: "Hide Armour", modifiers: { armour: 1 }, type: "wearable" },
@@ -39,6 +41,7 @@ export const ITEMS = [
   { id: "amulet_of_defence", name: "Amulet of Defence", modifiers: { armour: 1 } },
 
   // Key items (alphabetical order)
+  { id: "bar_of_gold_bullion", name: "Bar of Gold Bullion", modifiers: {} },
   { id: "black_prism", name: "Black Prism", modifiers: {} },
   { id: "bluestone", name: "Bluestone", modifiers: {} },
   { id: "bronze_locket", name: "Bronze Locket", modifiers: {} },
