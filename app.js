@@ -57,8 +57,9 @@ const CODE_BOOKS = [
 
 const GARRISON_OPTIONS = [
   { value: "", label: "— None —" },
-  { value: "Luutanesh", label: "Luutanesh" },
+  { value: "Clifftop", label: "Clifftop" },
   { value: "Cursus", label: "Cursus" },
+  { value: "Luutanesh", label: "Luutanesh" },
 ];
 
 const FLEET_GOODS = ["Salt", "Crops", "Steel", "Spices", "Wine", "Slaves"];
@@ -1505,7 +1506,6 @@ function renderEditors() {
             ${requiresEquipped ? `
               <div class="form-check form-switch lk-equip-switch">
                 <input class="form-check-input" type="checkbox" data-k="equipment" data-field="equipped" data-ei="${slot}" data-i="${state.selectedPartyIndex}" ${eq.equipped ? "checked" : ""} id="${equippedId}">
-                <label class="form-check-label" for="${equippedId}">Equipped</label>
               </div>
             ` : `<span class="text-body-secondary small">—</span>`}
           </td>
@@ -2201,7 +2201,7 @@ function renderFleets() {
     return `
       <div class="lk-army-row${idx < state.fleets.length - 1 ? " mb-2" : ""}">
         <div class="row g-2 align-items-end">
-          <div class="col-12 col-md-4">
+          <div class="col-12 col-md-3">
             <label class="form-label" for="${idBase}-name">Ship name</label>
             <input type="text" class="form-control" id="${idBase}-name" data-fleet-field="name" data-fleet-index="${idx}" value="${escapeHtml(fleet.name)}" placeholder="Ship name">
           </div>
@@ -2218,7 +2218,7 @@ function renderFleets() {
             <input type="number" min="0" max="99" class="form-control" id="${idBase}-cargo" data-fleet-field="cargo" data-fleet-index="${idx}" value="${fleet.cargo}">
           </div>
           <div class="col-12 col-md-2">
-            <label class="form-label" for="${idBase}-garrison">🗺️ Garrison</label>
+            <label class="form-label" for="${idBase}-garrison">🗺️ Harbour</label>
             <select class="form-select" id="${idBase}-garrison" data-fleet-field="garrison" data-fleet-index="${idx}">${garrisonOptions}</select>
           </div>
           <div class="col-12 col-md-1 d-flex justify-content-md-end align-items-end">
