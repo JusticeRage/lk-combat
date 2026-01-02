@@ -43,16 +43,20 @@ export const ITEMS = [
   { id: "chain_armour", name: "Chain Armour", modifiers: { armour: 2 }, type: "wearable" },
   { id: "bronze_armour", name: "Bronze Armour", modifiers: { armour: 4 }, type: "wearable" },
   { id: "black_plate_armour", name: "Black Plate Armour", modifiers: { armour: 3 }, type: "wearable" },
+
+  // Amulets
   { id: "amulet_of_defence", name: "Amulet of Defence", modifiers: { armour: 1 } },
+  { id: "amulet_of_health", name: "Amulet of Health", modifiers: { health: 1 } },
 
   // Potions
   { id: "potion_of_invulnerability", name: "Potion of Invulnerability", modifiers: {}, countable: true },
 
   // Key items (alphabetical order)
   { id: "bar_of_gold_bullion", name: "Bar of Gold Bullion", modifiers: {} },
+  { id: "barbarian_body", name: "Barbarian Body", modifiers: {}, size: 5 },
   { id: "beautiful_letter", name: "Beautiful Letter", modifiers: {} },
   { id: "black_prism", name: "Black Prism", modifiers: {} },
-  { id: "bluestone", name: "Bluestone", modifiers: {} },
+  { id: "bluestone", name: "Bluestone", modifiers: {}, countable: true },
   { id: "bronze_locket", name: "Bronze Locket", modifiers: {} },
   { id: "bronze_scorpion", name: "Bronze Scorpion", modifiers: {} },
   { id: "calligraphy_ink", name: "Calligraphy Ink", modifiers: {} },
