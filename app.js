@@ -330,6 +330,8 @@ const formatSpellOptionLabel = (spell) => {
 };
 
 function summarizeSpellEffect(spell) {
+  const desc = typeof spell?.description === "string" ? spell.description.trim() : "";
+  if (desc) return desc;
   if (!spell?.steps?.length) return "No spell effect details available.";
   const describeStep = (step) => {
     if (!step || typeof step !== "object") return "Mystical energies swirl.";
@@ -1595,14 +1597,16 @@ function renderEditors() {
         const spellDescription = matchedSpell
           ? summarizeSpellEffect(matchedSpell)
           : "Enter a known spell to see its description.";
+        const rechargeDisplay = matchedSpell?.recharge ?? "—";
         spellRows.push(`
           <tr>
             <td>
-              <div class="d-flex flex-column gap-1">
-                <label class="form-label mb-0" for="${inputId}">Spell ${i + 1}</label>
-                <input id="${inputId}" type="text" list="spellOptions" data-k="spellId" data-si="${i}" data-i="${state.selectedPartyIndex}" class="form-control form-control-sm" value="${escapeHtml(spellName)}" placeholder="Spell name">
+              <div class="d-flex flex-column">
+                <label class="visually-hidden" for="${inputId}">Spell name (slot ${i + 1})</label>
+                <input id="${inputId}" type="text" list="spellOptions" data-k="spellId" data-si="${i}" data-i="${state.selectedPartyIndex}" class="form-control form-control-sm" value="${escapeHtml(spellName)}" placeholder="Spell name" aria-label="Spell name">
               </div>
             </td>
+            <td class="text-center text-body-secondary small">${escapeHtml(rechargeDisplay)}</td>
             <td>
               <div class="text-body-secondary small lh-sm">${escapeHtml(spellDescription)}</div>
             </td>
@@ -1637,6 +1641,7 @@ function renderEditors() {
             <thead>
               <tr>
                 <th scope="col">Spell</th>
+                <th scope="col" class="text-center">Recharge</th>
                 <th scope="col">Description</th>
                 <th scope="col" class="text-center">Charged</th>
               </tr>
@@ -3239,6 +3244,12 @@ function initUI() {
   });
   $("silverAdjustCancel").addEventListener("click", () => bsModalHide("silverDialog"));
   $("silverAdjustOk").addEventListener("click", applySilverAdjustment);
+  $("silverAdjustAmount").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      applySilverAdjustment();
+    }
+  });
 
   // Heal/damage party dialogs
   $("healParty").addEventListener("click", () => {
