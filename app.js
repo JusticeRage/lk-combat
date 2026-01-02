@@ -70,6 +70,13 @@ const GARRISON_OPTIONS = [
   { value: "Luutanesh", label: "Luutanesh" },
 ];
 
+const HARBOUR_OPTIONS = [
+  { value: "", label: "— None —" },
+  { value: "Clifftop", label: "Clifftop" },
+  { value: "Cursus", label: "Cursus" },
+  { value: "Mordain", label: "Mordain" },
+];
+
 const FLEET_GOODS = ["Salt", "Crops", "Steel", "Spices", "Wine", "Slaves"];
 
 const STAT_LABELS = {
@@ -194,6 +201,10 @@ function normalizeGarrison(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeHarbour(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function normalizeCargoGood(value) {
   const match = typeof value === "string"
     ? FLEET_GOODS.find(g => g.toLowerCase() === value.trim().toLowerCase())
@@ -218,7 +229,7 @@ function normalizeArmies(list) {
 }
 
 function normalizeFleet(raw) {
-  const base = { name: "", fighting: 0, health: 0, maxHealth: 0, cargo: 0, garrison: "", cargoContents: [] };
+  const base = { name: "", fighting: 0, health: 0, maxHealth: 0, cargo: 0, harbour: "", cargoContents: [] };
   if (!raw || typeof raw !== "object") return base;
 
   const cargo = clampInt(raw.cargo, 0, 99, base.cargo);
@@ -236,7 +247,7 @@ function normalizeFleet(raw) {
     maxHealth,
     cargo,
     cargoContents,
-    garrison: normalizeGarrison(raw.garrison),
+    harbour: normalizeHarbour(raw.harbour ?? raw.garrison),
   };
 }
 
@@ -789,7 +800,7 @@ function saveSetupToStorage(state) {
       health: f.health,
       cargo: f.cargo,
       cargoContents: f.cargoContents,
-      garrison: f.garrison,
+      harbour: f.harbour,
     })),
     party: state.party.map(p => ({
       name: p.name,
@@ -1047,7 +1058,7 @@ function parseFleetsImport(text) {
     const healthLine = lines.find(l => /^health\b/i.test(l));
     const currentHealthLine = lines.find(l => /^current\s*health\b/i.test(l));
     const cargoLine = lines.find(l => /^cargo\b/i.test(l));
-    const garrisonLine = lines.find(l => /^garrison\b/i.test(l));
+    const harbourLine = lines.find(l => /^(harbour|garrison)\b/i.test(l));
 
     if (!fightingLine || !healthLine || !cargoLine) {
       throw new Error(`Fleet "${name}" needs Fighting, Health, and Cargo lines.`);
@@ -1064,11 +1075,11 @@ function parseFleetsImport(text) {
       throw new Error(`Could not read stats for "${name}".`);
     }
 
-    const garrison = garrisonLine
-      ? garrisonLine.replace(/^garrison\s*:?/i, "").trim()
+    const harbour = harbourLine
+      ? harbourLine.replace(/^(harbour|garrison)\s*:?/i, "").trim()
       : "";
 
-    return normalizeFleet({ name, fighting, health, maxHealth, cargo, garrison });
+    return normalizeFleet({ name, fighting, health, maxHealth, cargo, harbour });
   });
 
   if (!fleets.length) throw new Error("No fleets found.");
@@ -2466,7 +2477,7 @@ function renderFleets() {
   }
 
   const rows = state.fleets.map((fleet, idx) => {
-    const garrisonLabel = fleet.garrison ? escapeHtml(fleet.garrison) : "Harbour unset";
+    const harbourLabel = fleet.harbour ? escapeHtml(fleet.harbour) : "Harbour unset";
     const shipName = escapeHtml(fleet.name || `Fleet ${idx + 1}`);
     const maxHp = Math.max(1, fleet.maxHealth || fleet.health || 1);
     const hpBar = renderHp(fleet.health, maxHp);
@@ -2474,22 +2485,16 @@ function renderFleets() {
       const label = good ? escapeHtml(good) : `Empty ${cargoIdx + 1}`;
       return `<span class="badge text-bg-secondary lk-badge">${label}</span>`;
     }).join(" ");
-    const cargoText = fleet.cargo > 0
-      ? (cargoSlots || `<span class="text-body-secondary small">${fleet.cargo} empty cargo slot${fleet.cargo === 1 ? "" : "s"}.</span>`)
+    const cargoText = cargoSlots
+      ? cargoSlots
       : `<span class="text-body-secondary small">No cargo space.</span>`;
 
-    const stats = [
-      { label: "⚔️ Fighting", value: fleet.fighting || 0 },
-      { label: "🩸 Current HP", value: `${fleet.health}/${maxHp}` },
-      { label: "📦 Cargo", value: `${fleet.cargo} slot${fleet.cargo === 1 ? "" : "s"}` },
-      { label: "🗺️ Harbour", value: garrisonLabel },
-    ];
-    const statGrid = `
-      <div class="lk-stat-grid">
-        ${stats.map(stat => `
-          <div class="lk-stat-label">${stat.label}</div>
-          <div class="lk-stat-value">${stat.value}</div>
-        `).join("")}
+    const statLine = `
+      <div class="d-flex flex-wrap gap-3 align-items-center">
+        <div class="lk-stat-label mb-0">⚔️ Fighting</div>
+        <div class="lk-stat-value">${fleet.fighting || 0}</div>
+        <div class="lk-stat-label mb-0">🗺️ Harbour</div>
+        <div class="lk-stat-value">${harbourLabel}</div>
       </div>
     `;
 
@@ -2499,7 +2504,7 @@ function renderFleets() {
           <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
             <div>
               <div class="fw-semibold">${shipName}</div>
-              <div class="text-body-secondary small">${garrisonLabel}</div>
+              <div class="text-body-secondary small">${harbourLabel}</div>
             </div>
             <div class="d-flex gap-2">
               <button type="button" class="btn btn-outline-secondary btn-sm lk-icon-btn" data-fleet-edit="${idx}" aria-label="Edit fleet">
@@ -2513,7 +2518,7 @@ function renderFleets() {
           <div class="row g-3 align-items-center">
             <div class="col-12 col-lg-4">${hpBar}</div>
             <div class="col-12 col-lg-8 d-flex flex-column gap-2">
-              ${statGrid}
+              ${statLine}
               <div class="d-flex flex-wrap gap-2 align-items-center">
                 <div class="lk-stat-label mb-0">Cargo manifest</div>
                 <div class="d-flex flex-wrap gap-2">${cargoText}</div>
@@ -2553,11 +2558,11 @@ function openFleetEditDialog(idx) {
   const fleet = state.fleets[idx];
   if (!fleet) return;
   fleetEditIndex = idx;
-  const options = [...GARRISON_OPTIONS];
-  const hasCustomGarrison = fleet.garrison && !options.some(opt => opt.value === fleet.garrison);
-  if (hasCustomGarrison) options.push({ value: fleet.garrison, label: fleet.garrison });
-  $("fleetEditGarrison").innerHTML = options.map(opt => `
-    <option value="${escapeHtml(opt.value)}"${opt.value === fleet.garrison ? " selected" : ""}>${escapeHtml(opt.label)}</option>
+  const options = [...HARBOUR_OPTIONS];
+  const hasCustomHarbour = fleet.harbour && !options.some(opt => opt.value === fleet.harbour);
+  if (hasCustomHarbour) options.push({ value: fleet.harbour, label: fleet.harbour });
+  $("fleetEditHarbour").innerHTML = options.map(opt => `
+    <option value="${escapeHtml(opt.value)}"${opt.value === fleet.harbour ? " selected" : ""}>${escapeHtml(opt.label)}</option>
   `).join("");
 
   $("fleetEditName").value = fleet.name;
@@ -2592,7 +2597,7 @@ function saveFleetEditDialog() {
     const health = clampInt($("fleetEditHealth").value, 0, maxHealth, fleet.health);
     const cargo = clampInt($("fleetEditCargo").value, 0, 99, fleet.cargo);
     const cargoContents = readFleetEditCargoValues(cargo);
-    const garrison = normalizeGarrison($("fleetEditGarrison").value);
+    const harbour = normalizeHarbour($("fleetEditHarbour").value);
 
     state.fleets[fleetEditIndex] = normalizeFleet({
       ...fleet,
@@ -2602,7 +2607,7 @@ function saveFleetEditDialog() {
       maxHealth,
       cargo,
       cargoContents,
-      garrison,
+      harbour,
     });
 
     saveSetupToStorage(state);
@@ -2662,8 +2667,9 @@ function onFleetFieldChange(target) {
     return;
   }
 
-  if (field === "name" || field === "garrison") {
-    fleet[field] = field === "garrison" ? normalizeGarrison(target.value) : target.value;
+  if (field === "name" || field === "harbour" || field === "garrison") {
+    const key = field === "garrison" ? "harbour" : field;
+    fleet[key] = key === "harbour" ? normalizeHarbour(target.value) : target.value;
   }
 
   if (field === "fighting" || field === "health") {
