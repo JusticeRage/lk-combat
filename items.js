@@ -38,10 +38,15 @@ export const ITEMS = [
 
   // Armours
   { id: "hide_armour", name: "Hide Armour", modifiers: { armour: 1 }, type: "wearable" },
+  { id: "leather_armour", name: "Leather Armour", modifiers: { armour: 1 }, type: "wearable" },
   { id: "bone_armour", name: "Bone Armour", modifiers: { armour: 2 }, type: "wearable" },
+  { id: "chain_armour", name: "Chain Armour", modifiers: { armour: 2 }, type: "wearable" },
   { id: "bronze_armour", name: "Bronze Armour", modifiers: { armour: 4 }, type: "wearable" },
   { id: "black_plate_armour", name: "Black Plate Armour", modifiers: { armour: 3 }, type: "wearable" },
   { id: "amulet_of_defence", name: "Amulet of Defence", modifiers: { armour: 1 } },
+
+  // Potions
+  { id: "potion_of_invulnerability", name: "Potion of Invulnerability", modifiers: {}, countable: true },
 
   // Key items (alphabetical order)
   { id: "bar_of_gold_bullion", name: "Bar of Gold Bullion", modifiers: {} },
@@ -61,7 +66,7 @@ export const ITEMS = [
   { id: "goldwax_candle", name: "Goldwad Candle", modifiers: {} },
   { id: "grey_talisman", name: "Grey Talisman", modifiers: {}, countable: true },
   { id: "hygliph_flower", name: "Hygliph flower", modifiers: {} },
-  { id: "incense", name: "Incense", modifiers: {} },
+  { id: "incense", name: "Incense", modifiers: {}, countable: true },
   { id: "iron_key", name: "Iron Key", modifiers: {} },
   { id: "iron_sceptre", name: "Iron Sceptre", modifiers: {} },
   { id: "jewellery_box", name: "Jewellery Box", modifiers: {} },
@@ -72,6 +77,8 @@ export const ITEMS = [
   { id: "quicksilver", name: "Quicksilver", modifiers: {} },
   { id: "registry_papers", name: "Registry Papers", modifiers: {} },
   { id: "ring_of_the_patriarch", name: "Ring of the Patriarch", modifiers: {} },
+  { id: "royal_ledger", name: "Royal Ledger", modifiers: {} },
+  { id: "rusty_key", name: "Rusty Key", modifiers: {} },
   { id: "scrolls_of_cursus", name: "Scrolls of Cursus", modifiers: {} },
   { id: "seal_of_house_ross", name: "Seal of House Ross", modifiers: {} },
   { id: "silver_idol", name: "Silver Idol", modifiers: {} },
