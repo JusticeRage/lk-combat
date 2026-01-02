@@ -16,6 +16,7 @@ export const ITEMS = [
   // Lore items
   { id: "reference_book", name: "Reference book", modifiers: { lore: 1 } },
   { id: "tome_of_knowledge", name: "Tome of knowledge", modifiers: { lore: 2 } },
+  { id: "scrolls_of_lore", name: "Scrolls of Lore", modifiers: { lore: 3 } },
 
   // Shields
   { id: "shield", name: "Shield", modifiers: { armour: 2 }, hands: 1 },
@@ -58,13 +59,13 @@ export const ITEMS = [
   { id: "gold_portrait", name: "Gold Portrait", modifiers: {} },
   { id: "golden_candlestick", name: "Golden Candlestick", modifiers: {} },
   { id: "goldwax_candle", name: "Goldwad Candle", modifiers: {} },
-  { id: "grey_talisman", name: "Grey Talisman", modifiers: {} },
+  { id: "grey_talisman", name: "Grey Talisman", modifiers: {}, countable: true },
   { id: "hygliph_flower", name: "Hygliph flower", modifiers: {} },
   { id: "incense", name: "Incense", modifiers: {} },
   { id: "iron_key", name: "Iron Key", modifiers: {} },
   { id: "iron_sceptre", name: "Iron Sceptre", modifiers: {} },
   { id: "jewellery_box", name: "Jewellery Box", modifiers: {} },
-  { id: "lizard_hide", name: "Lizard Hide", modifiers: {} },
+  { id: "lizard_hide", name: "Lizard Hide", modifiers: {}, countable: true },
   { id: "magical_weave", name: "Magical Weave", modifiers: {} },
   { id: "precious_tomes", name: "Precious Tomes", modifiers: {} },
   { id: "prybar", name: "Prybar", modifiers: {} },
