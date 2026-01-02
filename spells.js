@@ -73,6 +73,19 @@ export const SPELLS = [
     ],
   },
   {
+    id: "clinging_dread",
+    name: "Clinging Dread",
+    type: "mass_combat",
+    timing: "mass_combat",
+    oncePerBattle: false,
+    recharge: 50,
+    targetMode: "singleEnemyUnit",
+    steps: [
+      { type: "massReduceMorale", amount: 1 },
+    ],
+    description: "Reduce the Morale score of an enemy unit by 1 point.",
+  },
+  {
     id: "animal_speech",
     name: "Animal Speech",
     type: "adventure",
