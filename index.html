@@ -435,6 +435,32 @@ Successes Required: 4"></textarea>
       </div>
     </div>
 
+    <!-- Mass combat encounter import -->
+    <div class="modal fade" id="massEncounterImportDialog" tabindex="-1" aria-labelledby="massEncounterImportDialogLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5 mb-0" id="massEncounterImportDialogLabel">Import mass combat encounter</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="text-body-secondary small mb-2">
+              Example format:<br />
+              <span class="lk-pill">Left Flank</span><br />
+              <span class="lk-pill">Front: Spearmen of Saltdad – Strength 2, Morale 2</span><br />
+              <span class="lk-pill">Support: None</span>
+            </div>
+            <textarea id="massEncounterImportText" spellcheck="false" class="form-control lk-textarea" rows="10"></textarea>
+            <div id="massEncounterImportError" class="invalid-feedback d-block" style="display:none;"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" id="massEncounterImportCancel" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="massEncounterImportOk">Import encounter</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Tabs -->
     <ul class="nav nav-tabs mb-3" id="lkTabs" role="tablist">
       <li class="nav-item" role="presentation">
@@ -769,6 +795,60 @@ Successes Required: 4"></textarea>
           </div>
           <div class="card-body">
             <div id="armyList" class="lk-army-list"></div>
+          </div>
+        </div>
+
+        <div class="card shadow-sm mt-3">
+          <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <div>
+              <h2 class="h5 mb-0">Mass combat</h2>
+              <div class="text-body-secondary small">Control two zones to win.</div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap justify-content-end">
+              <button class="btn btn-outline-primary btn-sm" id="importMassEncounter" type="button">Import encounter</button>
+              <button class="btn btn-outline-secondary btn-sm" id="resetMassCombat" type="button">Reset</button>
+              <button class="btn btn-success btn-sm" id="startMassCombat" type="button">Start / Restart</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+              <div class="d-flex flex-wrap gap-2 align-items-center">
+                <span class="lk-pill" id="massPhasePill">Phase: —</span>
+              </div>
+              <div id="massTurnHint" class="text-body-secondary small text-end"></div>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-2" id="massZoneSummary"></div>
+            <div class="d-flex flex-wrap gap-2 justify-content-end mt-2">
+              <button class="btn btn-outline-primary btn-sm" id="resolveMassStep" type="button">Resolve next clash</button>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-12 col-xl-8">
+                <div id="massBattlefield"></div>
+              </div>
+              <div class="col-12 col-xl-4">
+                <div class="card shadow-sm mb-3">
+                  <div class="card-header d-flex align-items-center justify-content-between gap-2">
+                    <h2 class="h6 mb-0" id="massLatestRollTitle">Latest clash</h2>
+                  </div>
+                  <div class="card-body">
+                    <div id="massLatestRoll" class="lk-latest-roll"></div>
+                  </div>
+                </div>
+                <div class="card shadow-sm">
+                  <div class="card-header d-flex align-items-center justify-content-between gap-2">
+                    <h2 class="h6 mb-0">Log</h2>
+                    <div class="d-flex gap-2">
+                      <button class="btn btn-outline-secondary btn-sm" id="clearMassLog" type="button">Clear</button>
+                      <button class="btn btn-outline-primary btn-sm" id="copyMassLog" type="button">Copy</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <textarea id="massLog" class="form-control lk-textarea" rows="10" readonly></textarea>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
