@@ -70,6 +70,7 @@ const GARRISON_OPTIONS = [
   { value: "", label: "— None —" },
   { value: "Clifftop", label: "Clifftop" },
   { value: "Cursus", label: "Cursus" },
+  { value: "Saltdad", label: "Saltdad" },
   { value: "Luutanesh", label: "Luutanesh" },
 ];
 
@@ -3697,8 +3698,9 @@ function applyMassMoraleCheck(zoneKey, side) {
   const roll = rollD6(1)[0];
   const survives = roll <= unit.morale;
   if (survives) {
+    const moraleBefore = unit.morale;
     unit.morale = Math.max(0, unit.morale - 1);
-    pushMassLog(`  ${side === "player" ? "Your" : "Enemy"} ${unit.name} holds (Morale ${unit.morale}/${unit.maxMorale}).`);
+    pushMassLog(`  ${side === "player" ? "Your" : "Enemy"} ${unit.name} holds (rolled ${roll} vs Morale ${moraleBefore}; now ${unit.morale}/${unit.maxMorale}).`);
   } else {
     routMassUnit(zoneKey, side, `Morale ${unit.morale}, rolled ${roll}`);
   }
@@ -3826,6 +3828,7 @@ function startMassCombat() {
   if (state.massCombat.phase !== "placement") {
     const restored = restoreMassBattleBackup();
     if (!restored) state.massCombat.phase = "placement";
+    else renderArmies();
   }
   pruneMassDeploymentArmies();
   const hasPlayer = MASS_ZONE_ORDER.some(z => state.massCombat.deployment?.[z]?.player?.front);
