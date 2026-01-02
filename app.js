@@ -312,6 +312,17 @@ const formatSpellType = (spell) => {
   return label.charAt(0).toUpperCase() + label.slice(1);
 };
 
+const formatSpellTargetMode = (mode) => {
+  if (!mode) return "No target required";
+  const map = {
+    singleEnemy: "Single enemy",
+    multiEnemyDistinct: "Different enemies",
+    singleAlly: "Single ally",
+    allEnemies: "All enemies",
+  };
+  return map[mode] || mode;
+};
+
 const formatSpellOptionLabel = (spell) => {
   const typeLabel = formatSpellType(spell);
   return `${spell.name} (${typeLabel} • Recharge ${spell.recharge})`;
@@ -326,6 +337,9 @@ function summarizeSpellEffect(spell) {
       const attacks = times === 1 ? "an attack" : `${times} attacks`;
       const targetNote = step.mustBeDifferentTargets ? " at different targets" : "";
       return `Make ${attacks} at Fighting ${step.fighting || 0}${targetNote}.`;
+    }
+    if (step.type === "attackEachEnemy") {
+      return `Make an attack at Fighting ${step.fighting || 0} against each enemy.`;
     }
     if (step.type === "damageFixed") {
       const bypass = step.bypassDefence ? " (ignores defence)" : "";
@@ -388,6 +402,16 @@ function matchItem(text) {
   const byName = ITEMS.find(it => it.name.toLowerCase() === String(text).toLowerCase());
   if (byName) return { id: byName.id, custom: "", count: 1, equipped: null };
   return { id: "", custom: String(text), count: 1, equipped: null };
+}
+
+function matchSpell(text) {
+  if (!text) return "";
+  const normalized = String(text).trim();
+  if (!normalized) return "";
+  const byId = getSpellById(normalized);
+  if (byId) return byId.id;
+  const byName = SPELLS.find(sp => sp.name.toLowerCase() === normalized.toLowerCase());
+  return byName?.id || "";
 }
 
 function normalizeEquipmentEntry(raw) {
@@ -1345,6 +1369,24 @@ function castSpell({ casterIdx, spellId, targets }) {
       }
     }
 
+    if (step.type === "attackEachEnemy") {
+      state.mobs.forEach((mob, idx) => {
+        if (!mob || mob.dead || mob.health <= 0) {
+          pushLog(`        (skipped) target ${idx + 1} invalid/dead`);
+          return;
+        }
+        const { rolls, hits } = computeAttackHits(step.fighting, mob.defTarget);
+        recordLatestRoll({ rolls, target: mob.defTarget });
+        pushLog(`        Attack vs ${mob.name} | dice=${step.fighting} rolls=${fmtDice(rolls)} vs Def ${mob.defTarget}+ => hits=${hits}`);
+        if (hits > 0) {
+          mob.health -= hits;
+          pushLog(`                 ${mob.name} takes ${hits} damage (HP ${Math.max(0, mob.health)}/${mob.maxHealth})`);
+        } else {
+          pushLog(`                 No damage.`);
+        }
+      });
+    }
+
     if (step.type === "damageFixed") {
       const mobIdx = targets.enemy?.[0];
       const mob = state.mobs[mobIdx];
@@ -1417,6 +1459,14 @@ function renderEditors() {
     document.body.appendChild(itemList);
   }
   itemList.innerHTML = ITEMS.map(it => `<option value="${escapeHtml(it.name)}"></option>`).join("");
+
+  let spellList = document.getElementById("spellOptions");
+  if (!spellList) {
+    spellList = document.createElement("datalist");
+    spellList.id = "spellOptions";
+    document.body.appendChild(spellList);
+  }
+  spellList.innerHTML = SPELLS.map(sp => `<option value="${escapeHtml(sp.name)}" label="${escapeHtml(formatSpellOptionLabel(sp))}"></option>`).join("");
 
   clampSelectedPartyIndex();
 
@@ -1535,16 +1585,14 @@ function renderEditors() {
         : [];
       for (let i = 0; i < SPELL_SLOTS; i++) {
         const entry = knownSpells[i] || { id: "", status: "ready" };
-        const selectId = `spell-${state.selectedPartyIndex}-${i}-select`;
+        const inputId = `spell-${state.selectedPartyIndex}-${i}-input`;
         const chargedId = `spell-${state.selectedPartyIndex}-${i}-charged`;
+        const spellName = getSpellById(entry.id)?.name || entry.id || "";
         spellRows.push(`
           <div class="spell-row">
             <div>
-              <label class="form-label mb-1" for="${selectId}">Spell ${i + 1}</label>
-              <select id="${selectId}" data-k="spellId" data-si="${i}" data-i="${state.selectedPartyIndex}" class="form-select form-select-sm">
-                <option value="">— None —</option>
-                ${SPELLS.map(sp => `<option value="${sp.id}" ${entry.id === sp.id ? "selected" : ""}>${escapeHtml(formatSpellOptionLabel(sp))}</option>`).join("")}
-              </select>
+              <label class="form-label mb-1" for="${inputId}">Spell ${i + 1}</label>
+              <input id="${inputId}" type="text" list="spellOptions" data-k="spellId" data-si="${i}" data-i="${state.selectedPartyIndex}" class="form-control form-control-sm" value="${escapeHtml(spellName)}" placeholder="Spell name">
             </div>
             <div class="form-check mb-0 align-self-end">
               <input class="form-check-input" type="checkbox" data-k="spellStatus" data-si="${i}" data-i="${state.selectedPartyIndex}" ${entry.status !== "exhausted" ? "checked" : ""} id="${chargedId}">
@@ -1883,7 +1931,8 @@ function onPartyEdit(e) {
     const slot = Number(el.getAttribute("data-si"));
     if (slot >= 0 && slot < SPELL_SLOTS) {
       const status = p.spells[slot]?.status || "ready";
-      p.spells[slot] = { id: el.value, status: el.value ? status : "ready" };
+      const matchedId = matchSpell(el.value);
+      p.spells[slot] = { id: matchedId, status: matchedId ? status : "ready" };
     }
   }
   if (k === "spellStatus") {
@@ -2693,7 +2742,7 @@ function openSpellDialog() {
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h6 class="card-title mb-0">Choose targets</h6>
-          <span class="badge text-bg-secondary">${escapeHtml(sp.targetMode || "No target required")}</span>
+          <span class="badge text-bg-secondary">${escapeHtml(formatSpellTargetMode(sp.targetMode))}</span>
         </div>
         <div class="row g-3" id="spellTargetRows"></div>
       </div>
@@ -2719,6 +2768,14 @@ function openSpellDialog() {
       targetRows.appendChild(col);
       return sel;
     };
+
+    if (sp.targetMode === "allEnemies") {
+      const col = document.createElement("div");
+      col.className = "col-12";
+      col.innerHTML = `<div class="alert alert-info mb-0">This spell targets all enemies.</div>`;
+      targetRows.appendChild(col);
+      return;
+    }
 
     if (sp.targetMode === "singleEnemy") {
       const options = state.mobs.map((m, i) => [{ value: String(i), text: `${m.name}${(m.dead||m.health<=0) ? " (dead)" : ""}` }, !!(m.dead || m.health<=0)]);
@@ -2763,6 +2820,10 @@ function openSpellDialog() {
 
 function readSpellTargets(spell) {
   const targets = { enemy: [], ally: [] };
+  if (spell.targetMode === "allEnemies") {
+    targets.enemy = state.mobs.map((_, idx) => idx);
+    return targets;
+  }
   if (spell.targetMode === "singleEnemy") {
     targets.enemy.push(Number($("spellTargetEnemy0").value));
   } else if (spell.targetMode === "multiEnemyDistinct") {
