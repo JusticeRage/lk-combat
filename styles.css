@@ -528,6 +528,16 @@
 
 .lk-mass-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
 .lk-mass-grid__cell { height: 100%; }
+.lk-mass-grid__divider {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  color: var(--bs-secondary-color);
+  padding: .35rem 0;
+}
+.lk-mass-divider__line { flex: 1; border-top: 1px dashed var(--bs-border-color); }
+.lk-mass-divider__label { font-size: .9rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
 .lk-mass-card {
   border: 1px solid var(--bs-border-color);
   border-radius: .85rem;
