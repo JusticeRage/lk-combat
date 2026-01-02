@@ -3876,7 +3876,7 @@ function onMassPlayerSelectChange(selectEl) {
   renderMassCombat();
 }
 
-function onMassEnemyFieldChange(inputEl) {
+function onMassEnemyFieldChange(inputEl, { render = true } = {}) {
   const zone = inputEl.getAttribute("data-mass-zone");
   const slot = inputEl.getAttribute("data-mass-slot");
   const field = inputEl.getAttribute("data-mass-field");
@@ -3891,7 +3891,7 @@ function onMassEnemyFieldChange(inputEl) {
   }
   state.massCombat.deployment[zone].enemy[slot] = normalizeMassUnit(current);
   saveSetupToStorage(state);
-  renderMassCombat();
+  if (render) renderMassCombat();
 }
 
 function parseMassCombatEncounter(text) {
@@ -5076,7 +5076,7 @@ function initUI() {
   });
   massBattlefield?.addEventListener("input", (e) => {
     const enemyInput = e.target.closest("[data-mass-field]");
-    if (enemyInput) onMassEnemyFieldChange(enemyInput);
+    if (enemyInput) onMassEnemyFieldChange(enemyInput, { render: false });
   });
   $("massCastSpell")?.addEventListener("click", castMassSpell);
   ["massCaster", "massSpell", "massSpellTarget"].forEach(id => {
