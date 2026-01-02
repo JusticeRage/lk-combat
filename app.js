@@ -3352,7 +3352,7 @@ function renderMoraleBlock(unit) {
   return `
     <div class="lk-hp" aria-label="Morale">
       <div class="lk-hp-head">
-        <span class="lk-hp-title">Morale</span>
+        <span class="lk-hp-title">🙂 Morale</span>
         <span class="lk-hp-num">${current}/${max}</span>
       </div>
       <div class="progress" role="progressbar" aria-valuenow="${current}" aria-valuemin="0" aria-valuemax="${max}">
@@ -3576,7 +3576,8 @@ function parseMassCombatEncounter(text) {
   if (!lines.length) throw new Error("No lines found.");
   const zones = createEmptyMassZones();
   let currentZone = null;
-  const zoneRegex = /^(left|centre|center|right)\s+flank/i;
+  let placedUnits = 0;
+  const zoneRegex = /^(left|centre|center|right)(?:\s+flank)?\s*:?$/i;
   const unitRegex = /^(front|support)\s*:\s*(.+)$/i;
   const statRegex = /^(.*?)\s*[–-]\s*Strength\s*(\d+)\s*[;,]?\s*Morale\s*(\d+)/i;
 
@@ -3595,6 +3596,7 @@ function parseMassCombatEncounter(text) {
       const body = unitMatch[2];
       if (/^none$/i.test(body)) {
         zones[currentZone].enemy[pos] = null;
+        placedUnits++;
         continue;
       }
       const stats = body.match(statRegex);
@@ -3607,20 +3609,33 @@ function parseMassCombatEncounter(text) {
         morale: moraleVal,
         maxMorale: moraleVal,
       });
+      placedUnits++;
       continue;
     }
+    throw new Error(`Could not read line: "${line}".`);
   }
+
+  if (!placedUnits) throw new Error("No enemy units found.");
 
   return zones;
 }
 
 function applyMassEncounter(text) {
   const zones = parseMassCombatEncounter(text);
-  state.massCombat.deployment = zones;
+  const previousDeployment = normalizeMassZones(state.massCombat.deployment);
+  const merged = createEmptyMassZones();
+  MASS_ZONE_ORDER.forEach(zone => {
+    merged[zone].enemy = zones[zone].enemy;
+    merged[zone].player = previousDeployment[zone].player;
+  });
+
+  state.massCombat.deployment = merged;
   state.massCombat.phase = "placement";
   state.massCombat.zones = createEmptyMassZones();
   state.massCombat.log = [];
   state.massCombat.latestRoll = { groups: [], totalSuccesses: 0 };
+  state.massCombat.winner = null;
+  state.massCombat.startedAt = null;
   saveSetupToStorage(state);
   renderMassCombat();
 }
@@ -3645,7 +3660,7 @@ function renderMassUnitCard({ title, subtitle, unit, editable, side, zoneKey, sl
           </div>
         </div>
         <select class="form-select form-select-sm mt-2" data-mass-player-select data-mass-zone="${zoneKey}" data-mass-slot="${slot}" ${disabled ? "disabled" : ""}>${options.join("")}</select>
-        ${unit ? `<div class="mt-2 text-body-secondary small">Str ${unit.strength} • Morale ${unit.morale}</div>` : ""}
+        ${unit ? `<div class="mt-2 text-body-secondary small">⚔️ Str ${unit.strength} • 🙂 Morale ${unit.morale}</div>` : ""}
       </div>
     `;
   }
@@ -3666,11 +3681,11 @@ function renderMassUnitCard({ title, subtitle, unit, editable, side, zoneKey, sl
             <input type="text" id="mass-${zoneKey}-${slot}-name" class="form-control form-control-sm" data-mass-zone="${zoneKey}" data-mass-slot="${slot}" data-mass-field="name" value="${escapeHtml(unit?.name || "")}" ${disabled ? "disabled" : ""}>
           </div>
           <div class="col-6 col-xl-4">
-            <label class="form-label mb-1" for="mass-${zoneKey}-${slot}-strength">Strength</label>
+            <label class="form-label mb-1" for="mass-${zoneKey}-${slot}-strength">⚔️ Strength</label>
             <input type="number" min="0" max="999" id="mass-${zoneKey}-${slot}-strength" class="form-control form-control-sm" data-mass-zone="${zoneKey}" data-mass-slot="${slot}" data-mass-field="strength" value="${unit?.strength ?? 0}" ${disabled ? "disabled" : ""}>
           </div>
           <div class="col-6 col-xl-4">
-            <label class="form-label mb-1" for="mass-${zoneKey}-${slot}-morale">Morale</label>
+            <label class="form-label mb-1" for="mass-${zoneKey}-${slot}-morale">🙂 Morale</label>
             <input type="number" min="0" max="999" id="mass-${zoneKey}-${slot}-morale" class="form-control form-control-sm" data-mass-zone="${zoneKey}" data-mass-slot="${slot}" data-mass-field="morale" value="${unit?.morale ?? 0}" ${disabled ? "disabled" : ""}>
           </div>
         </div>
@@ -3680,7 +3695,7 @@ function renderMassUnitCard({ title, subtitle, unit, editable, side, zoneKey, sl
 
   const content = unit
     ? `<div class="fw-semibold">${escapeHtml(unit.name)}</div>
-       <div class="text-body-secondary small">Strength ${unit.strength}</div>
+       <div class="text-body-secondary small">⚔️ Strength ${unit.strength}</div>
        <div class="mt-2">${renderMoraleBlock(unit)}</div>`
     : `<div class="text-body-secondary small">No unit.</div>`;
 
@@ -3715,11 +3730,19 @@ function renderMassBattlefield() {
   const rows = [
     { side: "enemy", slot: "support", label: "Enemy", subtitle: "Support" },
     { side: "enemy", slot: "front", label: "Enemy", subtitle: "Front line" },
+    { divider: true },
     { side: "player", slot: "front", label: "You", subtitle: "Front line" },
     { side: "player", slot: "support", label: "You", subtitle: "Support" },
   ];
 
   const cells = rows.map(row => {
+    if (row.divider) {
+      return `<div class="lk-mass-grid__divider" aria-hidden="true">
+        <span class="lk-mass-divider__line"></span>
+        <span class="lk-mass-divider__label">Your forces</span>
+        <span class="lk-mass-divider__line"></span>
+      </div>`;
+    }
     return MASS_ZONE_ORDER.map(zone => {
       const unit = zones?.[zone]?.[row.side]?.[row.slot];
       return `<div class="lk-mass-grid__cell">${renderMassUnitCard({
