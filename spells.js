@@ -61,6 +61,18 @@ export const SPELLS = [
     ],
   },
   {
+    id: "sandstorm",
+    name: "Sandstorm",
+    type: "combat",
+    timing: "combat",
+    oncePerBattle: true,
+    recharge: 50,
+    targetMode: "allEnemies",
+    steps: [
+      { type: "attackEachEnemy", fighting: 3 },
+    ],
+  },
+  {
     id: "animal_speech",
     name: "Animal Speech",
     type: "adventure",
