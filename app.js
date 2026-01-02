@@ -618,8 +618,7 @@ function describeItem(item, entry) {
   }
   if (item.hands) details.push(item.hands === 2 ? "Two-handed" : "One-handed");
   if (item.type === "weapon") details.push("Weapon");
-  if (item.type === "weapon" || item.hands) details.push(entry?.equipped ? "Equipped" : "Unequipped");
-  if (item.countable) details.push(`Count: ${entry?.count || 1}`);
+  if (item.type === "wearable") details.push("Wearable");
   return details.join(" • ");
 }
 

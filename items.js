@@ -7,6 +7,7 @@ export const ITEMS = [
   // Survival items
   { id: "warm_cloak", name: "Warm cloak", modifiers: { survival: 1 } },
   { id: "rugged_cloak", name: "Rugged cloak", modifiers: { survival: 2 } },
+  { id: "cloak_of_protection", name: "Cloak of Protection", modifiers: { survival: 3 } },
 
   // Charisma items
   { id: "handsome_brooch", name: "Handsome brooch", modifiers: { charisma: 1 } },
@@ -26,6 +27,7 @@ export const ITEMS = [
   { id: "steel_scimitar", name: "Steel Scimitar", modifiers: { fighting: 2 }, hands: 1, type: "weapon" },
   { id: "masterwork_blade", name: "Masterwork Blade", modifiers: { fighting: 3 }, hands: 1, type: "weapon" },
   { id: "skallos_runeblade", name: "Skallos Runeblade", modifiers: { fighting: 3, lore: 2 }, hands: 1, type: "weapon" },
+  { id: "magical_shortsword", name: "Magical Shortsword", modifiers: { fighting: 4 }, hands: 1, type: "weapon" },
 
   // Two-handed weapons
   { id: "maul", name: "Maul", modifiers: { fighting: 1 }, hands: 2, type: "weapon" },
@@ -42,6 +44,7 @@ export const ITEMS = [
 
   // Key items (alphabetical order)
   { id: "bar_of_gold_bullion", name: "Bar of Gold Bullion", modifiers: {} },
+  { id: "beautiful_letter", name: "Beautiful Letter", modifiers: {} },
   { id: "black_prism", name: "Black Prism", modifiers: {} },
   { id: "bluestone", name: "Bluestone", modifiers: {} },
   { id: "bronze_locket", name: "Bronze Locket", modifiers: {} },
@@ -54,6 +57,7 @@ export const ITEMS = [
   { id: "fairbrother_family_crest", name: "Fairbrother Family Crest", modifiers: {} },
   { id: "gold_portrait", name: "Gold Portrait", modifiers: {} },
   { id: "golden_candlestick", name: "Golden Candlestick", modifiers: {} },
+  { id: "goldwax_candle", name: "Goldwad Candle", modifiers: {} },
   { id: "grey_talisman", name: "Grey Talisman", modifiers: {} },
   { id: "hygliph_flower", name: "Hygliph flower", modifiers: {} },
   { id: "incense", name: "Incense", modifiers: {} },
@@ -72,7 +76,8 @@ export const ITEMS = [
   { id: "talisman_saint_elias", name: "Talisman of Saint Elias", modifiers: {} },
   { id: "tithe_report", name: "Tithe Report", modifiers: {} },
   { id: "troglodyte_heads", name: "Troglodyte Heads", modifiers: {}, countable: true },
-  { id: "vial_of_poison", name: "Vial of poison", modifiers: {} },
+  { id: "vial_of_poison", name: "Vial of Poison", modifiers: {} },
+  { id: "wayfinder_rod", name: "Wayfinder Rod", modifiers: {} },
 ];
 
 export function getItemById(id) {
