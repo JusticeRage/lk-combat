@@ -42,6 +42,7 @@ const SPELLCASTER_NAMES = new Set([
 
 const EQUIPMENT_SLOTS = 10;
 const SPELL_SLOTS = 6;
+let silverAdjustMode = "add";
 
 const LS_KEY = "lk_combat_tracker_v3";
 const DEFAULT_CODES_PER_BOOK = 100;
@@ -1589,18 +1590,28 @@ function renderEditors() {
         const entry = knownSpells[i] || { id: "", status: "ready" };
         const inputId = `spell-${state.selectedPartyIndex}-${i}-input`;
         const chargedId = `spell-${state.selectedPartyIndex}-${i}-charged`;
-        const spellName = getSpellById(entry.id)?.name || entry.id || "";
+        const matchedSpell = getSpellById(entry.id);
+        const spellName = matchedSpell?.name || entry.id || "";
+        const spellDescription = matchedSpell
+          ? summarizeSpellEffect(matchedSpell)
+          : "Enter a known spell to see its description.";
         spellRows.push(`
-          <div class="spell-row">
-            <div>
-              <label class="form-label mb-1" for="${inputId}">Spell ${i + 1}</label>
-              <input id="${inputId}" type="text" list="spellOptions" data-k="spellId" data-si="${i}" data-i="${state.selectedPartyIndex}" class="form-control form-control-sm" value="${escapeHtml(spellName)}" placeholder="Spell name">
-            </div>
-            <div class="form-check mb-0 align-self-end">
-              <input class="form-check-input" type="checkbox" data-k="spellStatus" data-si="${i}" data-i="${state.selectedPartyIndex}" ${entry.status !== "exhausted" ? "checked" : ""} id="${chargedId}">
-              <label class="form-check-label" for="${chargedId}">Charged</label>
-            </div>
-          </div>
+          <tr>
+            <td>
+              <div class="d-flex flex-column gap-1">
+                <label class="form-label mb-0" for="${inputId}">Spell ${i + 1}</label>
+                <input id="${inputId}" type="text" list="spellOptions" data-k="spellId" data-si="${i}" data-i="${state.selectedPartyIndex}" class="form-control form-control-sm" value="${escapeHtml(spellName)}" placeholder="Spell name">
+              </div>
+            </td>
+            <td>
+              <div class="text-body-secondary small lh-sm">${escapeHtml(spellDescription)}</div>
+            </td>
+            <td class="text-center">
+              <div class="form-check d-inline-flex align-items-center justify-content-center mb-0">
+                <input class="form-check-input" type="checkbox" data-k="spellStatus" data-si="${i}" data-i="${state.selectedPartyIndex}" ${entry.status !== "exhausted" ? "checked" : ""} id="${chargedId}">
+              </div>
+            </td>
+          </tr>
         `);
       }
     }
@@ -1621,8 +1632,17 @@ function renderEditors() {
           <p class="lk-section-title mb-0">Spells</p>
           <span class="text-secondary small">${spellRows.length} slots</span>
         </div>
-        <div class="spell-card">
-          <div class="spell-body">${spellRows.join("")}</div>
+        <div class="lk-table table-responsive lk-spell-table">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th scope="col">Spell</th>
+                <th scope="col">Description</th>
+                <th scope="col" class="text-center">Charged</th>
+              </tr>
+            </thead>
+            <tbody>${spellRows.join("")}</tbody>
+          </table>
         </div>
       </div>
     ` : "";
@@ -1838,22 +1858,35 @@ function renderEditors() {
 
     holder.innerHTML = `
       <div class="lk-shared-mini">
-      <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+        <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
           <div>
-          <p class="text-uppercase small text-secondary fw-semibold mb-1">👛  Party silver</p>
+            <p class="text-uppercase small text-secondary fw-semibold mb-1">👛  Party silver</p>
           </div>
-          <div class="input-group input-group-sm" style="max-width: 240px;">
-          <span class="input-group-text">Silver coins</span>
-          <input type="number" class="form-control" min="0" max="999999"
-              data-k="silverCoins" value="${state.silverCoins || 0}" aria-label="Party silver coins">
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <div class="input-group input-group-sm" style="max-width: 260px;">
+              <span class="input-group-text">Silver coins</span>
+              <input type="number" class="form-control" min="0" max="999999"
+                  data-k="silverCoins" value="${state.silverCoins || 0}" aria-label="Party silver coins">
+            </div>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Adjust silver">
+              <button type="button" class="btn btn-outline-secondary" data-silver-adjust="add" aria-label="Add silver">
+                <i class="bi bi-plus-circle"></i>
+              </button>
+              <button type="button" class="btn btn-outline-secondary" data-silver-adjust="subtract" aria-label="Subtract silver">
+                <i class="bi bi-dash-circle"></i>
+              </button>
+            </div>
           </div>
-      </div>
+        </div>
       </div>
     `;
 
     holder.querySelectorAll('[data-k="silverCoins"]').forEach(el =>
       el.addEventListener("change", onPartyEdit)
     );
+    holder.querySelectorAll('[data-silver-adjust]').forEach(btn => {
+      btn.addEventListener("click", () => openSilverAdjustDialog(btn.getAttribute("data-silver-adjust")));
+    });
   }
 
   function renderMissionNotes() {
@@ -1864,7 +1897,41 @@ function renderEditors() {
       state.missionNotes = e.target.value || "";
       saveSetupToStorage(state);
     };
+}
+
+function openSilverAdjustDialog(mode) {
+  silverAdjustMode = mode === "subtract" ? "subtract" : "add";
+
+  const isSubtract = silverAdjustMode === "subtract";
+  const title = isSubtract ? "Subtract silver" : "Add silver";
+  const prompt = isSubtract ? "Silver to subtract" : "Silver to add";
+  const hint = `Current total: ${state.silverCoins || 0} silver coins.`;
+
+  $("silverDialogLabel").textContent = title;
+  $("silverDialogPrompt").textContent = prompt;
+  $("silverDialogHint").textContent = hint;
+  $("silverAdjustAmount").value = "1";
+  $("silverDialogError").style.display = "none";
+
+  bsModalShow("silverDialog");
+}
+
+function applySilverAdjustment() {
+  const amt = clampInt($("silverAdjustAmount").value, 0, 999999, 0);
+  if (!amt) {
+    $("silverDialogError").textContent = "Enter at least 1 silver coin.";
+    $("silverDialogError").style.display = "";
+    return;
   }
+
+  const current = state.silverCoins || 0;
+  const delta = silverAdjustMode === "subtract" ? -amt : amt;
+  state.silverCoins = Math.max(0, current + delta);
+  state.battleSeed = null;
+  saveSetupToStorage(state);
+  bsModalHide("silverDialog");
+  renderAll();
+}
 
 function enforceUniquePartyNames() {
   const seen = new Set();
@@ -3163,6 +3230,17 @@ function initUI() {
       $("spellError").style.display = "";
     }
   });
+
+  // Silver dialog
+  $("silverDialog").addEventListener("shown.bs.modal", () => {
+    const amt = $("silverAdjustAmount");
+    if (amt) {
+      amt.focus();
+      amt.select();
+    }
+  });
+  $("silverAdjustCancel").addEventListener("click", () => bsModalHide("silverDialog"));
+  $("silverAdjustOk").addEventListener("click", applySilverAdjustment);
 
   // Heal/damage party dialogs
   $("healParty").addEventListener("click", () => {
