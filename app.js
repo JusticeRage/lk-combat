@@ -311,12 +311,27 @@ function normalizeMassCombat(raw) {
     }
     return result;
   };
+  const normalizeSpellSlots = (spells) => {
+    const list = Array.isArray(spells) ? spells : [];
+    return Array.from({ length: SPELL_SLOTS }, (_, i) => ({
+      id: list[i]?.id || "",
+      status: list[i]?.status === "exhausted" ? "exhausted" : "ready",
+    }));
+  };
   const normalizeMassBackup = (backup) => {
     if (!backup || typeof backup !== "object") return null;
     return {
       armies: normalizeArmies(deepClone(backup.armies)),
       deployment: normalizeMassZones(deepClone(backup.deployment)),
       startedAt: typeof backup.startedAt === "string" ? backup.startedAt : null,
+      partySpells: Array.isArray(backup.partySpells)
+        ? backup.partySpells
+            .map(entry => ({
+              name: typeof entry?.name === "string" ? entry.name : "",
+              spells: normalizeSpellSlots(entry?.spells),
+            }))
+            .filter(entry => entry.name)
+        : [],
     };
   };
   return {
@@ -3747,12 +3762,35 @@ function resetMassCombatState() {
   renderMassCombat();
 }
 
+function snapshotPartySpellSlots() {
+  return state.party.map(member => ({
+    name: member.name,
+    spells: Array.from({ length: SPELL_SLOTS }, (_, i) => ({
+      id: member.spells?.[i]?.id || "",
+      status: member.spells?.[i]?.status === "exhausted" ? "exhausted" : "ready",
+    })),
+  }));
+}
+
+function restorePartySpells(spellBackup) {
+  if (!Array.isArray(spellBackup)) return;
+  for (const member of state.party) {
+    const saved = spellBackup.find(entry => entry.name === member.name);
+    if (!saved) continue;
+    member.spells = Array.from({ length: SPELL_SLOTS }, (_, i) => ({
+      id: saved.spells?.[i]?.id || "",
+      status: saved.spells?.[i]?.status === "exhausted" ? "exhausted" : "ready",
+    }));
+  }
+}
+
 function restoreMassBattleBackup() {
   const backup = state.massCombat?.battleBackup;
   if (!backup) return false;
   state.armies = normalizeArmies(deepClone(backup.armies));
   state.massCombat.deployment = normalizeMassZones(deepClone(backup.deployment));
   state.massCombat.startedAt = backup.startedAt || null;
+  restorePartySpells(backup.partySpells);
   pruneMassDeploymentArmies();
   return true;
 }
@@ -3780,6 +3818,7 @@ function startMassCombat() {
     armies: deepClone(state.armies),
     deployment: deepClone(state.massCombat.deployment),
     startedAt: startStamp,
+    partySpells: snapshotPartySpellSlots(),
   };
   state.massCombat.startedAt = startStamp;
   state.massCombat.zones = resetMassZonesFromDeployment();
@@ -4798,7 +4837,10 @@ function initUI() {
   document.addEventListener("keydown", (e) => {
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
     const tag = (e.target?.tagName || "").toUpperCase();
+    const activeTag = (document.activeElement?.tagName || "").toUpperCase();
     if (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || e.target?.isContentEditable) return;
+    if (["INPUT", "TEXTAREA", "SELECT"].includes(activeTag) || document.activeElement?.isContentEditable) return;
+    if (e.target?.closest(".lk-mass-card")) return;
 
     const key = (e.key || "").toLowerCase();
     const hotkey = APP_HOTKEYS.find(h => h.key === key);
