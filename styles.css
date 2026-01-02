@@ -545,8 +545,11 @@
   height: 100%;
   background: color-mix(in oklab, var(--bs-body-bg) 86%, var(--bs-tertiary-bg) 14%);
 }
+.lk-mass-card.is-active { border-color: var(--bs-danger); border-width: 2px; }
 .lk-mass-card__head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .lk-mass-card.is-empty { border-style: dashed; color: var(--bs-secondary-color); background: var(--bs-body-bg); }
+.lk-mass-card__name.is-routed { text-decoration: line-through; }
+.lk-mass-card__name.is-routed::after { content: " \1F480"; }
 
 @media (max-width: 991.98px) {
   .lk-party-shell { grid-template-columns: 1fr; }
