@@ -46,7 +46,7 @@ export const ITEMS = [
 
   // Amulets
   { id: "amulet_of_defence", name: "Amulet of Defence", modifiers: { armour: 1 } },
-  { id: "amulet_of_health", name: "Amulet of Health", modifiers: { health: 1 } },
+  { id: "amulet_of_health", name: "Amulet of Health", modifiers: { maxHealth: 1 } },
 
   // Potions
   { id: "potion_of_invulnerability", name: "Potion of Invulnerability", modifiers: {}, countable: true },

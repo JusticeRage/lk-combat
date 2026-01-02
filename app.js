@@ -555,11 +555,14 @@ function normalizeEquipmentEntry(raw) {
 function normalizeEquipmentList(rawList, { keepEmpty = false } = {}) {
   if (!Array.isArray(rawList)) return [];
   const normalized = [];
+  let slotsUsed = 0;
   for (const raw of rawList) {
     const entry = normalizeEquipmentEntry(raw);
     if (!entry.id && !entry.custom && !keepEmpty) continue;
+    const size = getEquipmentEntrySize(entry);
+    if (slotsUsed + size > EQUIPMENT_SLOTS) break;
     normalized.push(entry);
-    if (normalized.length >= EQUIPMENT_SLOTS) break;
+    slotsUsed += size;
   }
   return normalized;
 }
@@ -569,6 +572,19 @@ function getEquipmentItem(entry) {
   if (byId) return byId;
   if (!entry?.custom) return null;
   return ITEMS.find(it => it.name.toLowerCase() === entry.custom.toLowerCase()) || null;
+}
+
+function getEquipmentEntrySize(entry) {
+  const normalized = normalizeEquipmentEntry(entry);
+  const item = getEquipmentItem(normalized);
+  const rawSize = Number(item?.size ?? 1);
+  const baseSize = Number.isFinite(rawSize) ? rawSize : 1;
+  return clampInt(baseSize, 1, EQUIPMENT_SLOTS, 1);
+}
+
+function countEquipmentSlots(list) {
+  if (!Array.isArray(list)) return 0;
+  return list.reduce((sum, entry) => sum + getEquipmentEntrySize(entry), 0);
 }
 
 function getEquipmentModifiers(member) {
@@ -699,9 +715,16 @@ function formatCompactStat(stat) {
     : `${stat.base} (${stat.modified})`;
 }
 
+function getEntityHealth(entity) {
+  const baseMax = Math.max(1, entity?.maxHealth ?? 1);
+  const mods = Array.isArray(entity?.equipment) ? getEquipmentModifiers(entity) : {};
+  const max = Math.max(1, baseMax + (mods.maxHealth || 0));
+  const current = Math.min(Math.max(0, entity?.health ?? 0), max);
+  return { current, max };
+}
+
 function renderHpBlock(entity) {
-  const current = Math.max(0, entity?.health ?? 0);
-  const max = Math.max(1, entity?.maxHealth ?? 1);
+  const { current, max } = getEntityHealth(entity);
   const pct = Math.min(100, Math.max(0, (current / max) * 100));
   const hpClass = getHpBarClass(pct);
   return `
@@ -722,8 +745,7 @@ function renderHp(current, max) {
 }
 
 function renderPortraitHp(hero) {
-  const current = Math.max(0, hero?.health ?? 0);
-  const max = Math.max(1, hero?.maxHealth ?? 1);
+  const { current, max } = getEntityHealth(hero);
   const pct = Math.min(100, Math.max(0, (current / max) * 100));
   const hpClass = getHpBarClass(pct);
   return `
@@ -1296,7 +1318,11 @@ function checkDeaths() {
     if (!p.dead && p.health <= 0) { p.dead = true; p.health = 0; pushLog(`☠ Party member defeated: ${p.name}`); }
   }
   for (const m of state.mobs) {
-    if (!m.dead && m.health <= 0) { m.dead = true; m.health = 0; pushLog(`☠ Opponent defeated: ${m.name}`); }
+    if (!m.dead && m.health <= 0) {
+      m.dead = true;
+      m.health = 0;
+      pushLog(`☠ Opponent defeated: ~~${m.name}~~ 💀`);
+    }
   }
 }
 
@@ -1318,7 +1344,8 @@ function resetPartyRoundFlags() {
 function normalizeForCombat() {
   for (const p of state.party) {
     p.maxHealth = Math.max(1, clampInt(p.maxHealth, 1, 999, 8));
-    p.health = Math.min(clampInt(p.health, 0, 999, p.maxHealth), p.maxHealth);
+    const { current } = getEntityHealth(p);
+    p.health = current;
     p.dead = (p.health <= 0);
     p.fighting = clampInt(p.fighting, 0, 99, p.fighting);
     p.stealth = clampInt(p.stealth, 0, 99, p.stealth);
@@ -1482,7 +1509,8 @@ function resolveOneEnemyAttack(victimIdx) {
     }
 
     victim.health -= final;
-    pushLog(`        ${victim.name} HP ${Math.max(0, victim.health)}/${victim.maxHealth}`);
+    const victimHealth = getEntityHealth(victim);
+    pushLog(`        ${victim.name} HP ${victimHealth.current}/${victimHealth.max}`);
   } else {
     pushLog(`        No damage.`);
   }
@@ -1704,6 +1732,7 @@ function renderEditors() {
     enforceWeaponHandLimit(p);
     enforceSingleWearable(p);
     const equipment = normalizeEquipmentList(p.equipment, { keepEmpty: true });
+    const slotsUsed = countEquipmentSlots(equipment);
 
     const equipmentRows = equipment.map((eqRaw, slot) => {
       const eq = normalizeEquipmentEntry(eqRaw);
@@ -1769,8 +1798,8 @@ function renderEditors() {
 
     const equipmentMeta = `
       <div class="d-flex justify-content-between align-items-center equipment-meta">
-        <div class="text-body-secondary small">${equipment.length}/${EQUIPMENT_SLOTS} slots used</div>
-        <button class="btn btn-outline-primary btn-sm" data-add-equipment="${state.selectedPartyIndex}" ${equipment.length >= EQUIPMENT_SLOTS ? "disabled" : ""}>Add slot</button>
+        <div class="text-body-secondary small">${slotsUsed}/${EQUIPMENT_SLOTS} slots used</div>
+        <button class="btn btn-outline-primary btn-sm" data-add-equipment="${state.selectedPartyIndex}" ${slotsUsed >= EQUIPMENT_SLOTS ? "disabled" : ""}>Add slot</button>
       </div>
     `;
 
@@ -1960,7 +1989,7 @@ function renderEditors() {
     const p = state.party[i];
     if (!p) return;
     p.equipment = normalizeEquipmentList(p.equipment, { keepEmpty: true });
-    if (p.equipment.length >= EQUIPMENT_SLOTS) return;
+    if (countEquipmentSlots(p.equipment) >= EQUIPMENT_SLOTS) return;
     p.equipment.push({ ...EMPTY_EQUIPMENT_ENTRY });
     state.battleSeed = null;
     saveSetupToStorage(state);
@@ -2168,7 +2197,11 @@ function onPartyEdit(e) {
   if (k === "equipment") {
     const slot = Number(el.getAttribute("data-ei"));
     if (slot >= 0 && slot < EQUIPMENT_SLOTS) {
-      while (p.equipment.length <= slot) p.equipment.push({ ...EMPTY_EQUIPMENT_ENTRY });
+      let slotsUsed = countEquipmentSlots(p.equipment);
+      while (p.equipment.length <= slot && slotsUsed < EQUIPMENT_SLOTS) {
+        p.equipment.push({ ...EMPTY_EQUIPMENT_ENTRY });
+        slotsUsed += getEquipmentEntrySize(EMPTY_EQUIPMENT_ENTRY);
+      }
       const current = normalizeEquipmentEntry(p.equipment[slot]);
       const field = el.getAttribute("data-field");
       if (field === "count") {
@@ -2497,18 +2530,24 @@ function renderFleets() {
       : `<span class="text-body-secondary small">No cargo space.</span>`;
 
     const statLine = `
-      <div class="d-flex flex-wrap gap-3 align-items-center">
-        <div class="d-flex align-items-center gap-2">
-          <div class="lk-stat-label mb-0">⚔️ Fighting</div>
-          <div class="lk-stat-value">${fleet.fighting || 0}</div>
+      <div class="row g-3 align-items-center">
+        <div class="col-12 col-lg-4">
+          <div class="d-flex align-items-center gap-2">
+            <div class="lk-stat-label mb-0">⚔️ Fighting</div>
+            <div class="lk-stat-value">${fleet.fighting || 0}</div>
+          </div>
         </div>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-          <div class="lk-stat-label mb-0">Cargo manifest</div>
-          <div class="d-flex flex-wrap gap-2">${cargoText}</div>
+        <div class="col-12 col-lg-4">
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <div class="lk-stat-label mb-0">Cargo manifest</div>
+            <div class="d-flex flex-wrap gap-2">${cargoText}</div>
+          </div>
         </div>
-        <div class="d-flex align-items-center gap-2 ms-auto">
-          <div class="lk-stat-label mb-0">🗺️ Harbour</div>
-          <div class="lk-stat-value">${harbourLabel}</div>
+        <div class="col-12 col-lg-4">
+          <div class="d-flex align-items-center gap-2 justify-content-lg-end">
+            <div class="lk-stat-label mb-0">🗺️ Harbour</div>
+            <div class="lk-stat-value">${harbourLabel}</div>
+          </div>
         </div>
       </div>
     `;
@@ -2884,7 +2923,7 @@ function castSeaSpell() {
   if (known) known.status = "exhausted";
 
   if (state.seaCombat.enemy.health <= 0) {
-    pushSeaLog(`${state.seaCombat.enemy.name} sinks!`);
+    pushSeaLog(`~~${state.seaCombat.enemy.name}~~ 💀 sinks!`);
     endSeaCombat("victory");
     return;
   }
@@ -2911,7 +2950,7 @@ function seaPlayerAttack() {
   state.seaCombat.allowSpell = false;
 
   if (state.seaCombat.enemy.health <= 0) {
-    pushSeaLog(`${state.seaCombat.enemy.name} sinks!`);
+    pushSeaLog(`~~${state.seaCombat.enemy.name}~~ 💀 sinks!`);
     endSeaCombat("victory");
     return;
   }
