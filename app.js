@@ -50,6 +50,9 @@ const MAP_ZOOM_DEFAULT = 100;
 const MAP_ZOOM_MIN = 50;
 const MAP_ZOOM_MAX = 200;
 
+const MASS_ZONE_ORDER = ["left", "centre", "right"];
+const MASS_ZONE_LABELS = { left: "Left flank", centre: "Centre", right: "Right flank" };
+
 const CODE_BOOKS = [
   { key: "A", title: "The Valley of Bones", length: DEFAULT_CODES_PER_BOOK },
   { key: "B", title: "Crown and Tower", length: 110 },
@@ -96,6 +99,10 @@ const STAT_ICONS = {
   charisma: "💬",
   armour: "🛡️",
 };
+
+function uid(prefix = "id") {
+  return `${prefix}_${Math.random().toString(36).slice(2, 8)}`;
+}
 
 const SKILL_OPTIONS = [
   { key: "fighting", label: STAT_LABELS.fighting },
@@ -214,9 +221,10 @@ function normalizeCargoGood(value) {
 }
 
 function normalizeArmy(raw) {
-  const base = { name: "", strength: 0, morale: 0, garrison: "" };
+  const base = { id: uid("army"), name: "", strength: 0, morale: 0, garrison: "" };
   if (!raw || typeof raw !== "object") return base;
   return {
+    id: typeof raw.id === "string" && raw.id ? raw.id : base.id,
     name: typeof raw.name === "string" ? raw.name.trim() : base.name,
     strength: clampInt(raw.strength, 0, 999, base.strength),
     morale: clampInt(raw.morale, 0, 999, base.morale),
@@ -227,6 +235,75 @@ function normalizeArmy(raw) {
 function normalizeArmies(list) {
   if (!Array.isArray(list)) return [];
   return list.map(normalizeArmy);
+}
+
+function normalizeMassUnit(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const morale = clampInt(raw.morale, 0, 999, 0);
+  const maxMorale = clampInt(raw.maxMorale ?? morale, 0, 999, morale);
+  const strength = clampInt(raw.strength, 0, 999, 0);
+  const name = typeof raw.name === "string" ? raw.name.trim() : "";
+  if (!name && strength === 0 && morale === 0) return null;
+  return {
+    name,
+    strength,
+    morale,
+    maxMorale,
+    fromArmyId: typeof raw.fromArmyId === "string" && raw.fromArmyId ? raw.fromArmyId : null,
+    routed: !!raw.routed,
+  };
+}
+
+function createEmptyMassZones() {
+  return MASS_ZONE_ORDER.reduce((acc, zone) => {
+    acc[zone] = { enemy: { front: null, support: null }, player: { front: null, support: null } };
+    return acc;
+  }, {});
+}
+
+function normalizeMassZones(raw) {
+  const base = createEmptyMassZones();
+  const norm = typeof raw === "object" && raw ? raw : {};
+  for (const zone of MASS_ZONE_ORDER) {
+    base[zone] = {
+      enemy: {
+        front: normalizeMassUnit(norm?.[zone]?.enemy?.front),
+        support: normalizeMassUnit(norm?.[zone]?.enemy?.support),
+      },
+      player: {
+        front: normalizeMassUnit(norm?.[zone]?.player?.front),
+        support: normalizeMassUnit(norm?.[zone]?.player?.support),
+      },
+    };
+  }
+  return base;
+}
+
+function createDefaultMassCombat() {
+  return {
+    phase: "placement", // placement | active | ended
+    deployment: createEmptyMassZones(),
+    zones: createEmptyMassZones(),
+    log: [],
+    latestRoll: { groups: [], totalSuccesses: 0 },
+    currentZone: 0,
+    winner: null,
+    startedAt: null,
+  };
+}
+
+function normalizeMassCombat(raw) {
+  if (!raw || typeof raw !== "object") return createDefaultMassCombat();
+  return {
+    phase: ["placement", "active", "ended"].includes(raw.phase) ? raw.phase : "placement",
+    deployment: normalizeMassZones(raw.deployment),
+    zones: normalizeMassZones(raw.zones),
+    log: Array.isArray(raw.log) ? raw.log.slice(-200) : [],
+    latestRoll: buildLatestRoll(raw.latestRoll?.groups || []),
+    currentZone: clampInt(raw.currentZone, 0, MASS_ZONE_ORDER.length - 1, 0),
+    winner: raw.winner === "player" || raw.winner === "enemy" ? raw.winner : null,
+    startedAt: typeof raw.startedAt === "string" ? raw.startedAt : null,
+  };
 }
 
 function normalizeFleet(raw) {
@@ -810,12 +887,14 @@ function saveSetupToStorage(state) {
   state.armies = normalizeArmies(state.armies);
   state.fleets = normalizeFleets(state.fleets);
   state.seaCombat = normalizeSeaCombat(state.seaCombat);
+  state.massCombat = normalizeMassCombat(state.massCombat);
   const payload = {
     battleStartedAt: state.battleStartedAt,
     silverCoins: state.silverCoins || 0,
     vault: state.vault,
     missionNotes: state.missionNotes,
     armies: state.armies.map(a => ({
+      id: a.id,
       name: a.name,
       strength: a.strength,
       morale: a.morale,
@@ -865,6 +944,10 @@ function saveSetupToStorage(state) {
       ...state.seaCombat,
       log: state.seaCombat.log?.slice(-200) || [],
     },
+    massCombat: {
+      ...state.massCombat,
+      log: state.massCombat.log?.slice(-200) || [],
+    },
   };
   try { localStorage.setItem(LS_KEY, JSON.stringify(payload)); } catch {}
 }
@@ -888,6 +971,7 @@ function loadSetupFromStorage(state) {
     state.armies = normalizeArmies(obj.armies);
     state.fleets = normalizeFleets(obj.fleets);
     state.seaCombat = normalizeSeaCombat(obj.seaCombat);
+    state.massCombat = normalizeMassCombat(obj.massCombat);
 
     if (Array.isArray(obj.party)) {
       const seen = new Set();
@@ -1155,6 +1239,7 @@ const state = {
   skillCheck: normalizeSkillCheck(DEFAULT_SKILL_CHECK),
   diceRoller: { count: 1, latestRolls: [] },
   seaCombat: createDefaultSeaCombat(),
+  massCombat: createDefaultMassCombat(),
 };
 
 function buildLatestRoll(groups) {
@@ -3230,6 +3315,484 @@ function onSeaSpellSelectionChange() {
   saveSetupToStorage(state);
 }
 
+// --- Mass combat ---
+function buildMassUnitFromArmy(army) {
+  if (!army) return null;
+  const morale = clampInt(army.morale, 0, 999, 0);
+  return normalizeMassUnit({
+    name: army.name,
+    strength: army.strength,
+    morale,
+    maxMorale: morale,
+    fromArmyId: army.id,
+  });
+}
+
+function pruneMassDeploymentArmies() {
+  const validIds = new Set(state.armies.map(a => a.id));
+  const pruneContainer = (container) => {
+    for (const zone of MASS_ZONE_ORDER) {
+      ["front", "support"].forEach(pos => {
+        const unit = container?.[zone]?.player?.[pos];
+        if (unit && unit.fromArmyId && !validIds.has(unit.fromArmyId)) {
+          container[zone].player[pos] = null;
+        }
+      });
+    }
+  };
+  pruneContainer(state.massCombat.deployment);
+  pruneContainer(state.massCombat.zones);
+}
+
+function renderMoraleBlock(unit) {
+  const max = Math.max(0, unit?.maxMorale ?? unit?.morale ?? 0);
+  const current = Math.max(0, Math.min(max, unit?.morale ?? 0));
+  const pct = max > 0 ? Math.min(100, Math.max(0, (current / max) * 100)) : 0;
+  const hpClass = getHpBarClass(pct);
+  return `
+    <div class="lk-hp" aria-label="Morale">
+      <div class="lk-hp-head">
+        <span class="lk-hp-title">Morale</span>
+        <span class="lk-hp-num">${current}/${max}</span>
+      </div>
+      <div class="progress" role="progressbar" aria-valuenow="${current}" aria-valuemin="0" aria-valuemax="${max}">
+        <div class="progress-bar${hpClass ? ` ${hpClass}` : ""}" style="width:${pct}%"></div>
+      </div>
+    </div>
+  `;
+}
+
+function massZoneControl(zone) {
+  const playerHas = !!(zone?.player?.front || zone?.player?.support);
+  const enemyHas = !!(zone?.enemy?.front || zone?.enemy?.support);
+  if (playerHas && !enemyHas) return "player";
+  if (enemyHas && !playerHas) return "enemy";
+  return "contested";
+}
+
+function pushMassLog(line) {
+  state.massCombat.log = (state.massCombat.log || []).concat([line]).slice(-200);
+}
+
+function renderMassLog() {
+  const el = $("massLog");
+  if (!el) return;
+  el.value = (state.massCombat.log || []).join("\n");
+}
+
+function renderMassLatestRoll() {
+  renderRollDisplay({
+    wrapId: "massLatestRoll",
+    titleId: "massLatestRollTitle",
+    roll: state.massCombat?.latestRoll,
+    emptyText: "No clashes resolved yet.",
+  });
+}
+
+function resetMassZonesFromDeployment() {
+  const fresh = createEmptyMassZones();
+  for (const zone of MASS_ZONE_ORDER) {
+    ["enemy", "player"].forEach(side => {
+      ["front", "support"].forEach(pos => {
+        const src = state.massCombat.deployment?.[zone]?.[side]?.[pos];
+        if (src) {
+          fresh[zone][side][pos] = normalizeMassUnit({
+            ...src,
+            morale: src.maxMorale ?? src.morale,
+            maxMorale: src.maxMorale ?? src.morale,
+            routed: false,
+          });
+        }
+      });
+      if (!fresh[zone][side].front && fresh[zone][side].support) {
+        fresh[zone][side].front = fresh[zone][side].support;
+        fresh[zone][side].support = null;
+      }
+    });
+  }
+  return fresh;
+}
+
+function destroyArmyById(id) {
+  if (!id) return;
+  const before = state.armies.length;
+  state.armies = state.armies.filter(a => a.id !== id);
+  if (state.armies.length !== before) pruneMassDeploymentArmies();
+}
+
+function routMassUnit(zoneKey, side, reason = "") {
+  const zone = state.massCombat.zones?.[zoneKey];
+  if (!zone?.[side]?.front) return;
+  const unit = zone[side].front;
+  const owner = side === "player" ? "Your" : "Enemy";
+  pushMassLog(`  ${owner} ${unit.name || "unit"} routs${reason ? ` (${reason})` : ""}!`);
+  if (side === "player" && unit.fromArmyId) destroyArmyById(unit.fromArmyId);
+  zone[side].front = zone[side].support;
+  zone[side].support = null;
+  if (zone[side].front) pushMassLog(`    ${owner} support unit moves to the front.`);
+}
+
+function applyMassMoraleCheck(zoneKey, side) {
+  const unit = state.massCombat.zones?.[zoneKey]?.[side]?.front;
+  if (!unit) return;
+  const roll = rollD6(1)[0];
+  const survives = roll <= unit.morale;
+  if (survives) {
+    unit.morale = Math.max(0, unit.morale - 1);
+    pushMassLog(`  ${side === "player" ? "Your" : "Enemy"} ${unit.name} holds (Morale ${unit.morale}/${unit.maxMorale}).`);
+  } else {
+    routMassUnit(zoneKey, side, `Morale ${unit.morale}, rolled ${roll}`);
+  }
+}
+
+function checkMassVictory() {
+  const zones = state.massCombat.zones;
+  const controls = MASS_ZONE_ORDER.map(z => massZoneControl(zones[z]));
+  const playerZones = controls.filter(c => c === "player").length;
+  const enemyZones = controls.filter(c => c === "enemy").length;
+  if (playerZones >= 2 || enemyZones >= 2) {
+    const winner = playerZones >= 2 ? "player" : "enemy";
+    state.massCombat.phase = "ended";
+    state.massCombat.winner = winner;
+    pushMassLog(`=== ${winner === "player" ? "You control" : "Enemy controls"} two zones. ${winner === "player" ? "Victory" : "Defeat"}! ===`);
+    const losingSide = winner === "player" ? "enemy" : "player";
+    for (const zone of MASS_ZONE_ORDER) {
+      ["front", "support"].forEach(pos => {
+        const unit = zones?.[zone]?.[losingSide]?.[pos];
+        if (unit) {
+          routMassUnit(zone, losingSide, "Routs when battle ends");
+        }
+      });
+    }
+    saveSetupToStorage(state);
+    return true;
+  }
+  return false;
+}
+
+function resolveMassCombatStep() {
+  if (state.massCombat.phase !== "active") return;
+  const zoneKey = MASS_ZONE_ORDER[state.massCombat.currentZone] || MASS_ZONE_ORDER[0];
+  const zone = state.massCombat.zones[zoneKey];
+  const control = massZoneControl(zone);
+  if (control !== "contested") {
+    pushMassLog(`${MASS_ZONE_LABELS[zoneKey]} is controlled by ${control === "player" ? "you" : "the enemy"}.`);
+  } else {
+    const enemyUnit = zone.enemy.front;
+    const playerUnit = zone.player.front;
+    if (!enemyUnit || !playerUnit) {
+      pushMassLog(`${MASS_ZONE_LABELS[zoneKey]} has no opposing front units.`);
+    } else {
+      const enemyRoll = rollD6(1)[0];
+      const playerRoll = rollD6(1)[0];
+      const enemyScore = enemyRoll + enemyUnit.strength;
+      const playerScore = playerRoll + playerUnit.strength;
+      state.massCombat.latestRoll = buildLatestRoll([
+        { rolls: [enemyRoll], successMask: [true], label: `${enemyUnit.name} (Str ${enemyUnit.strength})` },
+        { rolls: [playerRoll], successMask: [true], label: `${playerUnit.name} (Str ${playerUnit.strength})` },
+      ]);
+      pushMassLog(`⚔️ ${MASS_ZONE_LABELS[zoneKey]} clash: Enemy ${enemyUnit.name} ${enemyScore} vs Your ${playerUnit.name} ${playerScore}.`);
+      if (playerScore > enemyScore) {
+        pushMassLog("  Enemy checks Morale.");
+        applyMassMoraleCheck(zoneKey, "enemy");
+      } else if (enemyScore > playerScore) {
+        pushMassLog("  Your unit checks Morale.");
+        applyMassMoraleCheck(zoneKey, "player");
+      } else {
+        pushMassLog("  Clash is inconclusive.");
+      }
+    }
+  }
+
+  state.massCombat.currentZone = (state.massCombat.currentZone + 1) % MASS_ZONE_ORDER.length;
+  if (!checkMassVictory()) saveSetupToStorage(state);
+  renderMassLatestRoll();
+  renderMassCombat();
+}
+
+function resetMassCombatState() {
+  state.massCombat = createDefaultMassCombat();
+  saveSetupToStorage(state);
+  renderMassCombat();
+}
+
+function startMassCombat() {
+  pruneMassDeploymentArmies();
+  const hasPlayer = MASS_ZONE_ORDER.some(z => state.massCombat.deployment?.[z]?.player?.front);
+  const hasEnemy = MASS_ZONE_ORDER.some(z => state.massCombat.deployment?.[z]?.enemy?.front);
+  if (!hasEnemy) {
+    alert("Set at least one enemy front unit before starting.");
+    return;
+  }
+  if (!hasPlayer) {
+    alert("Set at least one of your units at the front before starting.");
+    return;
+  }
+
+  state.massCombat.zones = resetMassZonesFromDeployment();
+  state.massCombat.phase = "active";
+  state.massCombat.currentZone = 0;
+  state.massCombat.winner = null;
+  const startStamp = state.massCombat.startedAt || nowStamp();
+  state.massCombat.startedAt = null;
+  state.massCombat.log = [`=== Mass combat started (${startStamp}) ===`];
+  state.massCombat.latestRoll = { groups: [], totalSuccesses: 0 };
+  if (!checkMassVictory()) saveSetupToStorage(state);
+  renderMassCombat();
+  renderMassLatestRoll();
+}
+
+function onMassPlayerSelectChange(selectEl) {
+  const zone = selectEl.getAttribute("data-mass-zone");
+  const slot = selectEl.getAttribute("data-mass-slot");
+  if (!zone || !slot) return;
+  const armyId = selectEl.value;
+  const army = state.armies.find(a => a.id === armyId);
+  state.massCombat.deployment[zone].player[slot] = army ? buildMassUnitFromArmy(army) : null;
+  saveSetupToStorage(state);
+  renderMassCombat();
+}
+
+function onMassEnemyFieldChange(inputEl) {
+  const zone = inputEl.getAttribute("data-mass-zone");
+  const slot = inputEl.getAttribute("data-mass-slot");
+  const field = inputEl.getAttribute("data-mass-field");
+  if (!zone || !slot || !field) return;
+  const current = state.massCombat.deployment[zone].enemy[slot] || { name: "", strength: 0, morale: 0, maxMorale: 0 };
+  if (field === "name") current.name = inputEl.value;
+  if (field === "strength") current.strength = clampInt(inputEl.value, 0, 999, current.strength || 0);
+  if (field === "morale") {
+    const morale = clampInt(inputEl.value, 0, 999, current.morale || 0);
+    current.morale = morale;
+    current.maxMorale = morale;
+  }
+  state.massCombat.deployment[zone].enemy[slot] = normalizeMassUnit(current);
+  saveSetupToStorage(state);
+  renderMassCombat();
+}
+
+function parseMassCombatEncounter(text) {
+  const lines = text.replace(/\r/g, "").split("\n").map(l => l.trim()).filter(Boolean);
+  if (!lines.length) throw new Error("No lines found.");
+  const zones = createEmptyMassZones();
+  let currentZone = null;
+  const zoneRegex = /^(left|centre|center|right)\s+flank/i;
+  const unitRegex = /^(front|support)\s*:\s*(.+)$/i;
+  const statRegex = /^(.*?)\s*[–-]\s*Strength\s*(\d+)\s*[;,]?\s*Morale\s*(\d+)/i;
+
+  for (const line of lines) {
+    const zoneMatch = line.match(zoneRegex);
+    if (zoneMatch) {
+      const key = zoneMatch[1].toLowerCase();
+      currentZone = key.startsWith("left") ? "left" : key.startsWith("right") ? "right" : "centre";
+      continue;
+    }
+
+    const unitMatch = line.match(unitRegex);
+    if (unitMatch) {
+      if (!currentZone) throw new Error("Specify a flank before listing units.");
+      const pos = unitMatch[1].toLowerCase() === "support" ? "support" : "front";
+      const body = unitMatch[2];
+      if (/^none$/i.test(body)) {
+        zones[currentZone].enemy[pos] = null;
+        continue;
+      }
+      const stats = body.match(statRegex);
+      if (!stats) throw new Error(`Could not read unit line: "${body}".`);
+      const [, name, strength, morale] = stats;
+      const moraleVal = Number(morale);
+      zones[currentZone].enemy[pos] = normalizeMassUnit({
+        name,
+        strength: Number(strength),
+        morale: moraleVal,
+        maxMorale: moraleVal,
+      });
+      continue;
+    }
+  }
+
+  return zones;
+}
+
+function applyMassEncounter(text) {
+  const zones = parseMassCombatEncounter(text);
+  state.massCombat.deployment = zones;
+  state.massCombat.phase = "placement";
+  state.massCombat.zones = createEmptyMassZones();
+  state.massCombat.log = [];
+  state.massCombat.latestRoll = { groups: [], totalSuccesses: 0 };
+  saveSetupToStorage(state);
+  renderMassCombat();
+}
+
+function renderMassUnitCard({ title, subtitle, unit, editable, side, zoneKey, slot, assignedArmies }) {
+  const help = subtitle ? `<div class="text-body-secondary small">${escapeHtml(subtitle)}</div>` : "";
+  const assigned = assignedArmies || new Set();
+  if (editable && side === "player") {
+    const options = state.armies.map(army => {
+      const disabled = assigned.has(army.id) && unit?.fromArmyId !== army.id;
+      const label = army.garrison ? `${army.name} — ${army.garrison}` : army.name;
+      return `<option value="${escapeHtml(army.id)}"${army.id === unit?.fromArmyId ? " selected" : ""}${disabled ? " disabled" : ""}>${escapeHtml(label || "Unnamed unit")}</option>`;
+    });
+    options.unshift(`<option value="">— None —</option>`);
+    const disabled = state.massCombat.phase !== "placement";
+    return `
+      <div class="lk-mass-card">
+        <div class="lk-mass-card__head">
+          <div>
+            <div class="fw-semibold">${escapeHtml(title)}</div>
+            ${help}
+          </div>
+        </div>
+        <select class="form-select form-select-sm mt-2" data-mass-player-select data-mass-zone="${zoneKey}" data-mass-slot="${slot}" ${disabled ? "disabled" : ""}>${options.join("")}</select>
+        ${unit ? `<div class="mt-2 text-body-secondary small">Str ${unit.strength} • Morale ${unit.morale}</div>` : ""}
+      </div>
+    `;
+  }
+
+  if (editable && side === "enemy") {
+    const disabled = state.massCombat.phase !== "placement";
+    return `
+      <div class="lk-mass-card">
+        <div class="lk-mass-card__head">
+          <div>
+            <div class="fw-semibold">${escapeHtml(title)}</div>
+            ${help}
+          </div>
+        </div>
+        <div class="row g-2 mt-1">
+          <div class="col-12">
+            <label class="form-label mb-1" for="mass-${zoneKey}-${slot}-name">Unit</label>
+            <input type="text" id="mass-${zoneKey}-${slot}-name" class="form-control form-control-sm" data-mass-zone="${zoneKey}" data-mass-slot="${slot}" data-mass-field="name" value="${escapeHtml(unit?.name || "")}" ${disabled ? "disabled" : ""}>
+          </div>
+          <div class="col-6 col-xl-4">
+            <label class="form-label mb-1" for="mass-${zoneKey}-${slot}-strength">Strength</label>
+            <input type="number" min="0" max="999" id="mass-${zoneKey}-${slot}-strength" class="form-control form-control-sm" data-mass-zone="${zoneKey}" data-mass-slot="${slot}" data-mass-field="strength" value="${unit?.strength ?? 0}" ${disabled ? "disabled" : ""}>
+          </div>
+          <div class="col-6 col-xl-4">
+            <label class="form-label mb-1" for="mass-${zoneKey}-${slot}-morale">Morale</label>
+            <input type="number" min="0" max="999" id="mass-${zoneKey}-${slot}-morale" class="form-control form-control-sm" data-mass-zone="${zoneKey}" data-mass-slot="${slot}" data-mass-field="morale" value="${unit?.morale ?? 0}" ${disabled ? "disabled" : ""}>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  const content = unit
+    ? `<div class="fw-semibold">${escapeHtml(unit.name)}</div>
+       <div class="text-body-secondary small">Strength ${unit.strength}</div>
+       <div class="mt-2">${renderMoraleBlock(unit)}</div>`
+    : `<div class="text-body-secondary small">No unit.</div>`;
+
+  return `
+    <div class="lk-mass-card${unit ? "" : " is-empty"}">
+      <div class="lk-mass-card__head">
+        <div>
+          <div class="fw-semibold">${escapeHtml(title)}</div>
+          ${help}
+        </div>
+      </div>
+      <div class="mt-1">${content}</div>
+    </div>
+  `;
+}
+
+function renderMassBattlefield() {
+  const grid = $("massBattlefield");
+  if (!grid) return;
+  pruneMassDeploymentArmies();
+  const zones = state.massCombat.phase === "placement" ? state.massCombat.deployment : state.massCombat.zones;
+  const assigned = new Set();
+  if (state.massCombat.phase === "placement") {
+    MASS_ZONE_ORDER.forEach(zone => {
+      ["front", "support"].forEach(pos => {
+        const unit = zones?.[zone]?.player?.[pos];
+        if (unit?.fromArmyId) assigned.add(unit.fromArmyId);
+      });
+    });
+  }
+
+  const rows = [
+    { side: "enemy", slot: "support", label: "Enemy", subtitle: "Support" },
+    { side: "enemy", slot: "front", label: "Enemy", subtitle: "Front line" },
+    { side: "player", slot: "front", label: "You", subtitle: "Front line" },
+    { side: "player", slot: "support", label: "You", subtitle: "Support" },
+  ];
+
+  const cells = rows.map(row => {
+    return MASS_ZONE_ORDER.map(zone => {
+      const unit = zones?.[zone]?.[row.side]?.[row.slot];
+      return `<div class="lk-mass-grid__cell">${renderMassUnitCard({
+        title: `${row.label} — ${MASS_ZONE_LABELS[zone]}`,
+        subtitle: row.subtitle,
+        unit,
+        editable: state.massCombat.phase === "placement",
+        side: row.side,
+        zoneKey: zone,
+        slot: row.slot,
+        assignedArmies: assigned,
+      })}</div>`;
+    }).join("");
+  }).join("");
+
+  grid.innerHTML = `<div class="lk-mass-grid">${cells}</div>`;
+}
+
+function renderMassCombat() {
+  const phasePill = $("massPhasePill");
+  const turnHint = $("massTurnHint");
+  const zoneSummary = $("massZoneSummary");
+  if (!phasePill || !turnHint || !zoneSummary) return;
+
+  state.massCombat = normalizeMassCombat(state.massCombat);
+  pruneMassDeploymentArmies();
+
+  const mc = state.massCombat;
+  const phaseLabel = mc.phase === "active" ? "Combat" : (mc.phase === "ended" ? "Ended" : "Placement");
+  phasePill.textContent = `Phase: ${phaseLabel}`;
+  turnHint.textContent = mc.phase === "active"
+    ? `Resolve clashes starting with ${MASS_ZONE_LABELS[MASS_ZONE_ORDER[mc.currentZone]]}.`
+    : "Place units, then start the battle.";
+
+  const controls = MASS_ZONE_ORDER.map(z => ({ zone: z, control: massZoneControl(mc.phase === "placement" ? mc.deployment[z] : mc.zones[z]) }));
+  zoneSummary.innerHTML = controls.map(({ zone, control }) => {
+    const status = control === "contested" ? "Contested" : (control === "player" ? "You" : "Enemy");
+    const cls = control === "player" ? "text-bg-success" : control === "enemy" ? "text-bg-danger" : "text-bg-secondary";
+    return `<span class="badge ${cls}">${escapeHtml(MASS_ZONE_LABELS[zone])}: ${status}</span>`;
+  }).join(" ");
+
+  const canStart = MASS_ZONE_ORDER.some(z => mc.deployment[z].player.front) && MASS_ZONE_ORDER.some(z => mc.deployment[z].enemy.front);
+  const canResolve = mc.phase === "active" && !mc.winner;
+
+  const startBtn = $("startMassCombat");
+  if (startBtn) { startBtn.disabled = !canStart; startBtn.setAttribute("aria-disabled", String(!canStart)); }
+  const resetBtn = $("resetMassCombat");
+  if (resetBtn) resetBtn.disabled = false;
+  const resolveBtn = $("resolveMassStep");
+  if (resolveBtn) resolveBtn.disabled = !canResolve;
+
+  renderMassBattlefield();
+  renderMassLog();
+  renderMassLatestRoll();
+}
+
+function clearMassLog() {
+  state.massCombat.log = [];
+  saveSetupToStorage(state);
+  renderMassLog();
+}
+
+async function copyMassLog() {
+  try {
+    await navigator.clipboard.writeText((state.massCombat.log || []).join("\n"));
+    pushMassLog("(mass combat log copied to clipboard)");
+  } catch {
+    pushMassLog("(!) Could not copy mass combat log (clipboard permission blocked).");
+  }
+  saveSetupToStorage(state);
+  renderMassLog();
+}
+
 function renderCodes() {
   const tabArea = $("codeBookTabs");
   const gridArea = $("codeGrid");
@@ -3576,6 +4139,7 @@ function renderAll() {
   renderTables();
   renderControls();
   renderArmies();
+  renderMassCombat();
   renderFleets();
   renderSeaCombat();
   renderCodes();
@@ -4111,6 +4675,41 @@ function initUI() {
     });
   }
 
+  // Mass combat
+  $("startMassCombat")?.addEventListener("click", startMassCombat);
+  $("resetMassCombat")?.addEventListener("click", resetMassCombatState);
+  $("resolveMassStep")?.addEventListener("click", resolveMassCombatStep);
+  $("importMassEncounter")?.addEventListener("click", () => {
+    $("massEncounterImportError").style.display = "none";
+    $("massEncounterImportError").textContent = "";
+    $("massEncounterImportText").value = "";
+    bsModalShow("massEncounterImportDialog");
+  });
+  $("massEncounterImportDialog")?.addEventListener("shown.bs.modal", () => $("massEncounterImportText")?.focus());
+  $("massEncounterImportCancel")?.addEventListener("click", () => bsModalHide("massEncounterImportDialog"));
+  $("massEncounterImportOk")?.addEventListener("click", () => {
+    try {
+      applyMassEncounter($("massEncounterImportText")?.value || "");
+      bsModalHide("massEncounterImportDialog");
+    } catch (e) {
+      $("massEncounterImportError").textContent = String(e?.message || e);
+      $("massEncounterImportError").style.display = "";
+    }
+  });
+  const massBattlefield = $("massBattlefield");
+  massBattlefield?.addEventListener("change", (e) => {
+    const select = e.target.closest("[data-mass-player-select]");
+    if (select) onMassPlayerSelectChange(select);
+    const enemyInput = e.target.closest("[data-mass-field]");
+    if (enemyInput) onMassEnemyFieldChange(enemyInput);
+  });
+  massBattlefield?.addEventListener("input", (e) => {
+    const enemyInput = e.target.closest("[data-mass-field]");
+    if (enemyInput) onMassEnemyFieldChange(enemyInput);
+  });
+  $("clearMassLog")?.addEventListener("click", clearMassLog);
+  $("copyMassLog")?.addEventListener("click", copyMassLog);
+
   // Fleets
   $("addFleet").addEventListener("click", () => {
     state.fleets.push(normalizeFleet({}));
@@ -4415,6 +5014,7 @@ function initState() {
     state.skillCheck = normalizeSkillCheck(DEFAULT_SKILL_CHECK);
     state.armies = [];
     state.seaCombat = createDefaultSeaCombat();
+    state.massCombat = createDefaultMassCombat();
     saveSetupToStorage(state);
   }
 }
