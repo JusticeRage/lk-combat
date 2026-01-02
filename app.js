@@ -98,6 +98,16 @@ const SKILL_OPTIONS = [
   { key: "charisma", label: STAT_LABELS.charisma },
 ];
 
+const APP_HOTKEYS = [
+  { key: "p", label: "Switch to Party tab", handler: () => showTabById("partyTabBtn") },
+  { key: "f", label: "Switch to Battle tab", handler: () => showTabById("battleTabBtn") },
+  { key: "s", label: "Switch to Skill checks tab", handler: () => showTabById("skillTabBtn") },
+  { key: "a", label: "Switch to Armies tab", handler: () => showTabById("armiesTabBtn") },
+  { key: "c", label: "Switch to Codes tab", handler: () => showTabById("codesTabBtn") },
+  { key: "m", label: "Switch to Maps tab", handler: () => showTabById("mapTabBtn") },
+  { key: "d", label: "Open the dice roller", handler: openDiceRollDialog },
+];
+
 const DEFAULT_SKILL_CHECK = {
   name: "Sneak past the goblin",
   type: "team", // team | individual
@@ -243,6 +253,14 @@ function bsModalHide(id) {
     return;
   }
   el.style.display = "none";
+}
+
+function showTabById(btnId) {
+  const btn = $(btnId);
+  if (!btn) return;
+  const tab = bootstrap.Tab.getOrCreateInstance(btn);
+  tab.show();
+  btn.focus();
 }
 
 // Ensure stats modal exists even if HTML doesn't include it (for Bootstrap-only UI)
@@ -1000,6 +1018,7 @@ const state = {
   mapZoom: MAP_ZOOM_DEFAULT,
   latestRoll: { groups: [], totalSuccesses: 0 },
   skillCheck: normalizeSkillCheck(DEFAULT_SKILL_CHECK),
+  diceRoller: { count: 1, latestRolls: [] },
 };
 
 function buildLatestRoll(groups) {
@@ -1084,6 +1103,38 @@ function renderRollDisplay(opts) {
 
 function renderLatestRoll() {
   renderRollDisplay({ wrapId: "latestRoll", titleId: "latestRollTitle", roll: state.latestRoll, emptyText: "No rolls yet." });
+}
+
+function renderDiceRoller() {
+  const wrap = $("diceRollResults");
+  const title = $("diceRollResultTitle");
+  const meta = $("diceRollMeta");
+  if (!wrap) return;
+
+  const rolls = Array.isArray(state.diceRoller?.latestRolls) ? state.diceRoller.latestRolls : [];
+  if (title) title.textContent = rolls.length ? `Latest roll (${rolls.length}d6)` : "Latest roll";
+  if (meta) meta.textContent = rolls.length ? `Sum: ${rolls.reduce((a, b) => a + b, 0)}` : "";
+
+  const diceHtml = rolls.map((r) => {
+    const face = Math.min(6, Math.max(1, Number(r) || 1));
+    return `<div class="lk-die"><img src="./img/dice_${face}.svg" alt="Die showing ${face}"></div>`;
+  }).join("");
+
+  wrap.innerHTML = rolls.length
+    ? `<div class="lk-roll-group"><div class="lk-dice-row">${diceHtml}</div></div>`
+    : `<div class="text-body-secondary small">Roll to see the dice.</div>`;
+}
+
+function renderHotkeyList() {
+  const list = $("hotkeyList");
+  if (!list) return;
+
+  list.innerHTML = APP_HOTKEYS.map(hotkey => `
+    <div class="list-group-item d-flex align-items-center justify-content-between gap-3">
+      <span class="fw-semibold">${escapeHtml(hotkey.label)}</span>
+      <span class="badge text-bg-secondary">${hotkey.key.toUpperCase()}</span>
+    </div>
+  `).join("");
 }
 
 function snapshot() {
@@ -2711,8 +2762,32 @@ function renderAll() {
   renderMaps();
   renderSkillCheck();
   renderLatestRoll();
+  renderDiceRoller();
   renderSkillRoll();
   renderLog();
+}
+
+function performDiceRoll() {
+  const input = $("diceRollCount");
+  const count = clampInt(Number(input?.value), 1, 30, 1);
+  if (input) input.value = String(count);
+
+  state.diceRoller.count = count;
+  state.diceRoller.latestRolls = rollD6(count);
+  renderDiceRoller();
+}
+
+function openDiceRollDialog() {
+  const count = clampInt(state.diceRoller?.count, 1, 30, 1);
+  const input = $("diceRollCount");
+  if (input) input.value = String(count);
+  renderDiceRoller();
+  bsModalShow("diceRollDialog");
+}
+
+function openHotkeyDialog() {
+  renderHotkeyList();
+  bsModalShow("hotkeyDialog");
 }
 
 // --- Dialogs: hero picker ---
@@ -3048,29 +3123,33 @@ function initUI() {
     });
   });
 
-  const tabHotkeys = {
-    p: "partyTabBtn",
-    f: "battleTabBtn",
-    s: "skillTabBtn",
-    a: "armiesTabBtn",
-    c: "codesTabBtn",
-    m: "mapTabBtn",
-  };
-
   document.addEventListener("keydown", (e) => {
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
     const tag = (e.target?.tagName || "").toUpperCase();
     if (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || e.target?.isContentEditable) return;
 
     const key = (e.key || "").toLowerCase();
-    const btnId = tabHotkeys[key];
-    if (!btnId) return;
+    const hotkey = APP_HOTKEYS.find(h => h.key === key);
+    if (!hotkey || typeof hotkey.handler !== "function") return;
 
-    const btn = $(btnId);
-    if (!btn) return;
-    const tab = bootstrap.Tab.getOrCreateInstance(btn);
-    tab.show();
-    btn.focus();
+    hotkey.handler();
+  });
+
+  $("hotkeyDialogBtn")?.addEventListener("click", openHotkeyDialog);
+
+  $("diceRollDialog")?.addEventListener("shown.bs.modal", () => {
+    const input = $("diceRollCount");
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  });
+  $("diceRollSubmit")?.addEventListener("click", performDiceRoll);
+  $("diceRollCount")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      performDiceRoll();
+    }
   });
 
   const mapZoom = $("mapZoom");
